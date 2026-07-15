@@ -36,12 +36,32 @@ CREATE TABLE IF NOT EXISTS stations (
     lng DOUBLE PRECISION NOT NULL
 );
 
+-- Lets seed_stations.py upsert by name_zh instead of inserting a fresh
+-- duplicate row every time the seed data changes.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_stations_name_zh ON stations (name_zh);
+
 CREATE TABLE IF NOT EXISTS station_lines (
     station_id INT NOT NULL REFERENCES stations(id) ON DELETE CASCADE,
     line_id INT NOT NULL REFERENCES lines(id) ON DELETE CASCADE,
     sequence INT NOT NULL,
     PRIMARY KEY (station_id, line_id)
 );
+
+-- Invisible "shape points" between two consecutive stations on a line, so the
+-- drawn polyline can follow the real track curvature instead of a straight
+-- line between station dots. Not real stations: not clickable, no claims, no
+-- FK from anything else. Fully rewritten by seed_stations.py on every boot
+-- (delete+reinsert per line), so there's nothing to migrate by hand — just
+-- edit _LINE_WAYPOINTS in seed_stations.py and redeploy.
+CREATE TABLE IF NOT EXISTS line_waypoints (
+    id SERIAL PRIMARY KEY,
+    line_id INT NOT NULL REFERENCES lines(id) ON DELETE CASCADE,
+    sequence INT NOT NULL,
+    lat DOUBLE PRECISION NOT NULL,
+    lng DOUBLE PRECISION NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_line_waypoints_line ON line_waypoints (line_id, sequence);
 
 CREATE TABLE IF NOT EXISTS teams (
     id SERIAL PRIMARY KEY,

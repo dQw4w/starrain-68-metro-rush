@@ -26,7 +26,6 @@ export default function MetroMap({
 }: MetroMapProps) {
   const teamById = new Map(teams.map((t) => [t.id, t]))
   const claimByStation = new Map(mapData.claims.map((c) => [c.station_id, c]))
-  const stationById = new Map(mapData.stations.map((s) => [s.id, s]))
 
   return (
     <MapContainer center={DEFAULT_CENTER} zoom={13} style={{ height, width: '100%' }} scrollWheelZoom>
@@ -35,10 +34,7 @@ export default function MetroMap({
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
       {mapData.lines.map((line) => {
-        const path = (mapData.line_paths[String(line.id)] || [])
-          .map((sid) => stationById.get(sid))
-          .filter((s): s is Station => !!s)
-          .map((s) => [s.lat, s.lng] as [number, number])
+        const path = mapData.line_paths[String(line.id)] || []
         if (path.length < 2) return null
         return <Polyline key={line.id} positions={path} pathOptions={{ color: line.color_hex, weight: 4, opacity: 0.75 }} />
       })}

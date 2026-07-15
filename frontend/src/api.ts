@@ -114,6 +114,8 @@ export const api = {
       headers: authHeaders(token),
       body: JSON.stringify(body),
     }),
+  deleteTeam: (token: string, teamId: number) =>
+    req<{ ok: boolean }>(`/superadmin/teams/${teamId}`, { method: 'DELETE', headers: authHeaders(token) }),
   overview: (token: string) => req<{ ranking: (TeamPublicWithPending)[] }>('/superadmin/overview', { headers: authHeaders(token) }),
   globalLog: (token: string) => req<ActionLogEntry[]>('/superadmin/log', { headers: authHeaders(token) }),
 

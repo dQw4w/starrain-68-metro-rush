@@ -12,13 +12,25 @@ async def _load_map_data() -> MapData:
     lines = await pool.fetch("SELECT * FROM lines ORDER BY sort_order")
     stations = await pool.fetch("SELECT * FROM stations ORDER BY id")
     station_lines = await pool.fetch("SELECT station_id, line_id, sequence FROM station_lines ORDER BY line_id, sequence")
+    waypoints = await pool.fetch("SELECT line_id, sequence, lat, lng FROM line_waypoints ORDER BY line_id, sequence")
     claims = await pool.fetch("SELECT * FROM station_claims")
 
+    stations_by_id = {s["id"]: s for s in stations}
     line_map: dict[int, list[int]] = {}
-    line_paths: dict[str, list[int]] = {}
+    # (sequence, lat, lng) per line, merging real stations and invisible
+    # waypoints so the frontend gets one ready-to-draw ordered point list.
+    line_points: dict[str, list[tuple[int, float, float]]] = {}
     for sl in station_lines:
         line_map.setdefault(sl["station_id"], []).append(sl["line_id"])
-        line_paths.setdefault(str(sl["line_id"]), []).append(sl["station_id"])
+        st = stations_by_id[sl["station_id"]]
+        line_points.setdefault(str(sl["line_id"]), []).append((sl["sequence"], st["lat"], st["lng"]))
+    for wp in waypoints:
+        line_points.setdefault(str(wp["line_id"]), []).append((wp["sequence"], wp["lat"], wp["lng"]))
+
+    line_paths = {
+        line_id: [[lat, lng] for _, lat, lng in sorted(points, key=lambda p: p[0])]
+        for line_id, points in line_points.items()
+    }
 
     return MapData(
         lines=[Line(**dict(l)) for l in lines],

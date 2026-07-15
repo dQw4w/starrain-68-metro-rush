@@ -130,7 +130,9 @@ class MapData(BaseModel):
     lines: list[Line]
     stations: list[Station]
     claims: list[StationClaim]
-    line_paths: dict[str, list[int]]  # line_id (as str) -> ordered station_ids, for drawing polylines
+    # line_id (as str) -> ordered [lat, lng] points (real stations + invisible
+    # line_waypoints interleaved by sequence), ready to draw as a polyline.
+    line_paths: dict[str, list[list[float]]]
 
 
 # ---------------------------------------------------------------------------

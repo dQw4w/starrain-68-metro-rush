@@ -34,7 +34,8 @@ export interface MapData {
   lines: Line[]
   stations: Station[]
   claims: StationClaim[]
-  line_paths: Record<string, number[]>
+  /** Ordered [lat, lng] points per line_id (stations + invisible waypoints interleaved), ready to draw. */
+  line_paths: Record<string, [number, number][]>
 }
 
 export interface TeamPublic {

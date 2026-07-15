@@ -1,11 +1,13 @@
 """Seeds the real Taipei Metro (TRTC) network: 6 main lines, 3 branches, ~131 stations.
 
 Coordinates for stations come from a real GIS source (leoluyi/taipei_mrt,
-itself derived from TRTC open data). The Circular Line (環狀線) and 
+itself derived from TRTC open data). The Circular Line (環狀線) and
 branch line definitions have been updated for correct rendering and topology.
 
-Run standalone with `python seed_stations.py`, or it runs automatically on
-backend startup if the `stations` table is empty.
+`seed()` is a full idempotent upsert and runs automatically on every backend
+startup (see migrate.py) — editing anything in this file (stations, lines,
+_LINE_WAYPOINTS, ...) and redeploying is enough, there is no separate DB step.
+Can also be run standalone with `python seed_stations.py`.
 """
 import asyncio
 
@@ -132,31 +134,101 @@ _LINE_STATIONS: dict[str, list[str]] = {
         "七張", "小碧潭",
     ],
     "Y": [
-        "大坪林", "十四張", "秀朗橋", "景平", "景安", "中和", "橋和", "中原", "板新", 
+        "大坪林", "十四張", "秀朗橋", "景平", "景安", "中和", "橋和", "中原", "板新",
         "板橋", "新埔民生", "頭前庄", "幸福", "新北產業園區",
     ],
 }
 
+# Invisible "shape points" inserted between two consecutive stations on a line,
+# so the drawn polyline follows the real track curve instead of a straight
+# line between station dots. Purely cosmetic — not real stations, not
+# clickable, no gameplay effect. Key is (line_code, from_station, to_station)
+# using the exact names/order from _LINE_STATIONS above (from earlier in the
+# list to later); value is an ordered list of (lat, lng) points to insert
+# between them.
+_LINE_WAYPOINTS: dict[tuple[str, str, str], list[tuple[float, float]]] = {
+    # BR Line (Wenhu)
+    ("BR", "中山國中", "松山機場"): [(25.0631, 121.5442)],
+    ("BR", "松山機場", "大直"): [(25.0715, 121.5505), (25.0760, 121.5490)],
+    ("BR", "大直", "劍南路"): [(25.0845, 121.5480)],
+    ("BR", "六張犁", "科技大樓"): [(25.0245, 121.5480)],
+    ("BR", "動物園", "木柵"): [(24.9982, 121.5760)],
+
+    # R Line (Tamsui-Xinyi)
+    ("R", "圓山", "民權西路"): [(25.0665, 121.5198)],
+    ("R", "中山", "台北車站"): [(25.0490, 121.5195)],
+    ("R", "台北車站", "台大醫院"): [(25.0440, 121.5168)],
+    ("R", "台大醫院", "中正紀念堂"): [(25.0380, 121.5165)],
+    ("R", "士林", "劍潭"): [(25.0880, 121.5255)],
+    ("R", "奇岩", "唭哩岸"): [(25.1225, 121.5030)],
+
+    # G Line (Songshan-Xindian)
+    ("G", "公館", "台電大樓"): [(25.0180, 121.5300)],
+    ("G", "台電大樓", "古亭"): [(25.0235, 121.5255)],
+    ("G", "小南門", "西門"): [(25.0355, 121.5085)],
+    ("G", "西門", "北門"): [(25.0450, 121.5095)],
+    ("G", "北門", "中山"): [(25.0535, 121.5105)],
+    ("G", "南京三民", "松山"): [(25.0510, 121.5710)],
+
+    # BL Line (Bannan)
+    ("BL", "龍山寺", "西門"): [(25.0355, 121.5080)],
+    ("BL", "西門", "台北車站"): [(25.0468, 121.5086)],
+    ("BL", "台北車站", "善導寺"): [(25.0455, 121.5200)],
+    ("BL", "板橋", "新埔"): [(25.0180, 121.4650)],
+    ("BL", "江子翠", "龍山寺"): [(25.0320, 121.4850)],
+
+    # O Line (Zhonghe-Xinlu)
+    ("O", "頂溪", "古亭"): [(25.0180, 121.5180)],
+    ("O", "古亭", "東門"): [(25.0270, 121.5280)],
+    ("O", "東門", "忠孝新生"): [(25.0380, 121.5305)],
+    ("O", "大橋頭", "台北橋"): [(25.0630, 121.5050)],
+    ("O", "先嗇宮", "頭前庄"): [(25.0425, 121.4670)],
+
+    # Y Line (Circular)
+    ("Y", "大坪林", "十四張"): [(24.9825, 121.5350)],
+    ("Y", "板新", "板橋"): [(25.0135, 121.4670)],
+    ("Y", "頭前庄", "幸福"): [(25.0440, 121.4605)],
+}
+
 
 async def seed(conn) -> None:
+    """Fully idempotent upsert — safe (and intended) to run on every startup,
+    so editing the data above and redeploying is enough; no manual DB step
+    needed. Stations/lines are matched by name/code and their lat/lng/color/
+    sequence are updated in place. Stations removed from the data below are
+    NOT deleted (to avoid ever dropping a station that already has a live
+    claim/log history) — only their line associations are pruned so a
+    station moved between lines doesn't keep a stale line membership.
+    """
     line_ids: dict[str, int] = {}
     for code, name_zh, name_en, color_hex, sort_order in LINES:
         row = await conn.fetchrow(
             """INSERT INTO lines (code, name_zh, name_en, color_hex, sort_order)
                VALUES ($1, $2, $3, $4, $5)
-               ON CONFLICT (code) DO UPDATE SET name_zh = EXCLUDED.name_zh
+               ON CONFLICT (code) DO UPDATE
+               SET name_zh = EXCLUDED.name_zh, name_en = EXCLUDED.name_en,
+                   color_hex = EXCLUDED.color_hex, sort_order = EXCLUDED.sort_order
                RETURNING id""",
             code, name_zh, name_en, color_hex, sort_order,
         )
         line_ids[code] = row["id"]
 
+    # Sequence numbers are spaced out (100, 200, 300, ...) instead of packed
+    # (1, 2, 3, ...) so line_waypoints can be inserted between any two
+    # consecutive stations without renumbering anything.
+    SEQ_STEP = 100
+
     station_ids: dict[str, int] = {}
+    station_line_pairs: set[tuple[int, int]] = set()
     for code, names in _LINE_STATIONS.items():
-        for seq, name in enumerate(names, start=1):
+        for i, name in enumerate(names):
+            seq = (i + 1) * SEQ_STEP
             if name not in station_ids:
                 lat, lng = _COORDS[name]
                 row = await conn.fetchrow(
-                    "INSERT INTO stations (name_zh, name_en, lat, lng) VALUES ($1, $1, $2, $3) RETURNING id",
+                    """INSERT INTO stations (name_zh, name_en, lat, lng) VALUES ($1, $1, $2, $3)
+                       ON CONFLICT (name_zh) DO UPDATE SET lat = EXCLUDED.lat, lng = EXCLUDED.lng
+                       RETURNING id""",
                     name, lat, lng,
                 )
                 station_ids[name] = row["id"]
@@ -170,17 +242,48 @@ async def seed(conn) -> None:
                    ON CONFLICT (station_id, line_id) DO UPDATE SET sequence = EXCLUDED.sequence""",
                 station_ids[name], line_ids[code], seq,
             )
+            station_line_pairs.add((station_ids[name], line_ids[code]))
 
-    logger.info(f"Seeded {len(line_ids)} lines and {len(station_ids)} stations.")
+    # Prune line memberships that are no longer in the data (e.g. a station
+    # moved to a different line), without touching the station rows themselves.
+    station_id_list = list(station_ids.values())
+    if station_id_list:
+        current_pairs = await conn.fetch(
+            "SELECT station_id, line_id FROM station_lines WHERE station_id = ANY($1::int[])",
+            station_id_list,
+        )
+        stale = [
+            (r["station_id"], r["line_id"])
+            for r in current_pairs
+            if (r["station_id"], r["line_id"]) not in station_line_pairs
+        ]
+        for station_id, line_id in stale:
+            await conn.execute(
+                "DELETE FROM station_lines WHERE station_id = $1 AND line_id = $2", station_id, line_id
+            )
 
+    # Waypoints have no identity of their own to upsert against, so each
+    # affected line's waypoints are simply wiped and rewritten from scratch.
+    seeded_line_ids = list(line_ids.values())
+    if seeded_line_ids:
+        await conn.execute("DELETE FROM line_waypoints WHERE line_id = ANY($1::int[])", seeded_line_ids)
+    for code, names in _LINE_STATIONS.items():
+        for i in range(len(names) - 1):
+            from_name, to_name = names[i], names[i + 1]
+            points = _LINE_WAYPOINTS.get((code, from_name, to_name))
+            if not points:
+                continue
+            from_seq = (i + 1) * SEQ_STEP
+            to_seq = (i + 2) * SEQ_STEP
+            step = (to_seq - from_seq) / (len(points) + 1)
+            for j, (lat, lng) in enumerate(points, start=1):
+                await conn.execute(
+                    "INSERT INTO line_waypoints (line_id, sequence, lat, lng) VALUES ($1, $2, $3, $4)",
+                    line_ids[code], round(from_seq + step * j), lat, lng,
+                )
 
-async def seed_if_empty(pool) -> None:
-    async with pool.acquire() as conn:
-        count = await conn.fetchval("SELECT COUNT(*) FROM stations")
-        if count > 0:
-            return
-        async with conn.transaction():
-            await seed(conn)
+    waypoint_count = sum(len(v) for v in _LINE_WAYPOINTS.values())
+    logger.info(f"Seeded {len(line_ids)} lines, {len(station_ids)} stations, {waypoint_count} line waypoints.")
 
 
 if __name__ == "__main__":

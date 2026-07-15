@@ -3,7 +3,7 @@ from loguru import logger
 from db import get_pool
 from auth import hash_pin
 from config import SUPERADMIN_BOOTSTRAP_PIN
-from seed_stations import seed_if_empty
+from seed_stations import seed
 
 _SCHEMA_PATH = Path(__file__).parent / "schema.sql"
 
@@ -15,7 +15,9 @@ async def run_migrations() -> None:
         await conn.execute(sql)
     logger.info("Schema migration complete.")
     await _ensure_superadmin()
-    await seed_if_empty(pool)
+    async with pool.acquire() as conn:
+        async with conn.transaction():
+            await seed(conn)
 
 
 async def _ensure_superadmin() -> None:

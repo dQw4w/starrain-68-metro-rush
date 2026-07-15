@@ -139,6 +139,37 @@ async def update_team(team_id: int, body: TeamUpdate, admin: AdminIdentity = Dep
     )
 
 
+@router.delete("/teams/{team_id}")
+async def delete_team(team_id: int, admin: AdminIdentity = Depends(require_superadmin)):
+    pool = get_pool()
+    cfg = await pool.fetchrow("SELECT * FROM game_config WHERE id = 1")
+    if cfg["locked"]:
+        raise HTTPException(
+            status_code=400,
+            detail="遊戲已開始，無法刪除隊伍（避免破壞既有紀錄）。可改用停用（active=false）。",
+        )
+    async with pool.acquire() as conn:
+        async with conn.transaction():
+            team = await conn.fetchrow("SELECT id FROM teams WHERE id = $1 FOR UPDATE", team_id)
+            if team is None:
+                raise HTTPException(status_code=404, detail="找不到此隊伍")
+            # Clean up everything that references this team before dropping the row
+            # itself — none of these FKs cascade, by design, so a team can never be
+            # silently dropped by an unrelated cascade once the game is live.
+            await conn.execute("UPDATE station_claims SET owner_team_id = NULL, value = 0 WHERE owner_team_id = $1", team_id)
+            await conn.execute("DELETE FROM device_positions WHERE team_id = $1", team_id)
+            await conn.execute("DELETE FROM approval_requests WHERE team_id = $1", team_id)
+            await conn.execute(
+                "DELETE FROM challenge_attempts WHERE team_id = $1 OR target_team_id = $1", team_id
+            )
+            await conn.execute("DELETE FROM action_log WHERE team_id = $1", team_id)
+            await conn.execute("DELETE FROM admins WHERE team_id = $1", team_id)
+            await conn.execute("DELETE FROM teams WHERE id = $1", team_id)
+    await manager.broadcast_global("config_update")
+    await manager.broadcast_global("map_update")
+    return {"ok": True}
+
+
 @router.get("/overview")
 async def overview(_: AdminIdentity = Depends(require_superadmin)):
     pool = get_pool()

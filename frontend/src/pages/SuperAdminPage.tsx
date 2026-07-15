@@ -7,7 +7,7 @@ import RankingBoard from '../components/RankingBoard'
 import { usePhase } from '../hooks/usePhase'
 import { useWebSocket, type WsEvent } from '../hooks/useWebSocket'
 import { clearAdminSession, loadAdminSession } from '../lib/adminSession'
-import type { ActionLogEntry, Challenge, GameConfig, TeamAdminView } from '../types'
+import type { ActionLogEntry, Challenge, GameConfig, MapData, Station, TeamAdminView } from '../types'
 
 type Tab = 'overview' | 'teams' | 'config' | 'challenges' | 'log'
 
@@ -21,6 +21,7 @@ export default function SuperAdminPage() {
   const [config, setConfig] = useState<GameConfig | null>(null)
   const [challenges, setChallenges] = useState<Challenge[]>([])
   const [log, setLog] = useState<ActionLogEntry[]>([])
+  const [mapData, setMapData] = useState<MapData | null>(null)
   const [error, setError] = useState('')
   const { phase, refetchPhase } = usePhase()
 
@@ -39,6 +40,7 @@ export default function SuperAdminPage() {
 
   useEffect(() => {
     refresh()
+    api.getMap().then(setMapData).catch(() => {})
   }, [refresh])
 
   const getTicket = useCallback(async () => {
@@ -101,6 +103,7 @@ export default function SuperAdminPage() {
             onChanged={refresh}
             onError={(m) => setError(m)}
             configLocked={config?.locked ?? false}
+            stations={mapData?.stations ?? []}
           />
         )}
 
@@ -136,25 +139,35 @@ function TeamsTab({
   onChanged,
   onError,
   configLocked,
+  stations,
 }: {
   teams: TeamAdminView[]
   token: string
   onChanged: () => void
   onError: (m: string) => void
   configLocked: boolean
+  stations: Station[]
 }) {
   const [name, setName] = useState('')
   const [color, setColor] = useState('#3B82F6')
   const [pin, setPin] = useState('')
+  const [meetingStationId, setMeetingStationId] = useState<number | ''>('')
   const [busy, setBusy] = useState(false)
+  const [editingId, setEditingId] = useState<number | null>(null)
 
   async function createTeam(e: React.FormEvent) {
     e.preventDefault()
     setBusy(true)
     try {
-      await api.createTeam(token, { name, color_hex: color, admin_pin: pin })
+      await api.createTeam(token, {
+        name,
+        color_hex: color,
+        admin_pin: pin,
+        meeting_station_id: meetingStationId === '' ? undefined : Number(meetingStationId),
+      })
       setName('')
       setPin('')
+      setMeetingStationId('')
       onChanged()
     } catch (e: any) {
       onError(e.message || '新增隊伍失敗')
@@ -163,40 +176,43 @@ function TeamsTab({
     }
   }
 
+  async function deleteTeam(t: TeamAdminView) {
+    if (!window.confirm(`確定要刪除隊伍「${t.name}」嗎？此動作無法復原。`)) return
+    try {
+      await api.deleteTeam(token, t.id)
+      onChanged()
+    } catch (e: any) {
+      onError(e.message || '刪除隊伍失敗')
+    }
+  }
+
   return (
     <div className="flex flex-col gap-4 max-w-xl">
       <div className="flex flex-col gap-2">
-        {teams.map((t) => {
-          const playerUrl = `${window.location.origin}/team/${t.share_token}`
-          return (
-          <div key={t.id} className="bg-white/5 rounded-xl p-3 flex flex-col gap-2">
-            <div className="flex items-center gap-3">
-              <span className="w-3.5 h-3.5 rounded-full shrink-0" style={{ backgroundColor: t.color_hex }} />
-              <div className="flex-1">
-                <p className="font-bold">{t.name}</p>
-                <p className="text-xs text-white/50">
-                  {t.stations_owned} 站 · {t.chips_balance} 枚
-                </p>
-              </div>
-              <Link to={`/admin/team/${t.id}`} className="bg-blue-600 rounded-lg px-3 py-1.5 text-sm font-bold">
-                進入審核
-              </Link>
-            </div>
-            <div className="flex items-center gap-2 bg-black/20 rounded-lg px-2 py-1.5">
-              <a href={playerUrl} target="_blank" rel="noreferrer" className="flex-1 text-xs text-blue-300 truncate">
-                {playerUrl}
-              </a>
-              <button
-                type="button"
-                onClick={() => navigator.clipboard.writeText(playerUrl)}
-                className="text-xs bg-white/10 rounded px-2 py-1 shrink-0"
-              >
-                複製連結
-              </button>
-            </div>
-          </div>
+        {teams.map((t) =>
+          editingId === t.id ? (
+            <TeamEditForm
+              key={t.id}
+              team={t}
+              token={token}
+              stations={stations}
+              onDone={() => {
+                setEditingId(null)
+                onChanged()
+              }}
+              onCancel={() => setEditingId(null)}
+              onError={onError}
+            />
+          ) : (
+            <TeamRow
+              key={t.id}
+              team={t}
+              onEdit={() => setEditingId(t.id)}
+              onDelete={() => deleteTeam(t)}
+              canDelete={!configLocked}
+            />
           )
-        })}
+        )}
       </div>
 
       {!configLocked && (
@@ -213,13 +229,163 @@ function TeamsTab({
               className="flex-1 bg-white/10 rounded-lg px-3 py-2 text-sm"
             />
           </div>
+          <StationSelect stations={stations} value={meetingStationId} onChange={setMeetingStationId} />
           <button disabled={busy} className="bg-emerald-600 disabled:opacity-40 rounded-lg py-2 font-bold text-sm">
             新增
           </button>
         </form>
       )}
-      {configLocked && <p className="text-white/40 text-sm">遊戲已開始，無法再新增隊伍。</p>}
+      {configLocked && <p className="text-white/40 text-sm">遊戲已開始，無法再新增隊伍，但仍可編輯資料或停用隊伍。</p>}
     </div>
+  )
+}
+
+function StationSelect({
+  stations,
+  value,
+  onChange,
+}: {
+  stations: Station[]
+  value: number | ''
+  onChange: (v: number | '') => void
+}) {
+  return (
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value === '' ? '' : Number(e.target.value))}
+      className="bg-white/10 rounded-lg px-3 py-2 text-sm"
+    >
+      <option value="">集合車站（可留空）</option>
+      {stations.map((s) => (
+        <option key={s.id} value={s.id}>
+          {s.name_zh}
+        </option>
+      ))}
+    </select>
+  )
+}
+
+function TeamRow({
+  team,
+  onEdit,
+  onDelete,
+  canDelete,
+}: {
+  team: TeamAdminView
+  onEdit: () => void
+  onDelete: () => void
+  canDelete: boolean
+}) {
+  const playerUrl = `${window.location.origin}/team/${team.share_token}`
+  return (
+    <div className={`bg-white/5 rounded-xl p-3 flex flex-col gap-2 ${!team.active ? 'opacity-50' : ''}`}>
+      <div className="flex items-center gap-3">
+        <span className="w-3.5 h-3.5 rounded-full shrink-0" style={{ backgroundColor: team.color_hex }} />
+        <div className="flex-1">
+          <p className="font-bold">
+            {team.name}
+            {!team.active && <span className="ml-2 text-xs text-amber-300 font-normal">已停用</span>}
+          </p>
+          <p className="text-xs text-white/50">
+            {team.stations_owned} 站 · {team.chips_balance} 枚
+          </p>
+        </div>
+        <button onClick={onEdit} className="bg-white/10 rounded-lg px-3 py-1.5 text-sm font-bold">
+          編輯
+        </button>
+        <Link to={`/admin/team/${team.id}`} className="bg-blue-600 rounded-lg px-3 py-1.5 text-sm font-bold">
+          進入審核
+        </Link>
+      </div>
+      <div className="flex items-center gap-2 bg-black/20 rounded-lg px-2 py-1.5">
+        <a href={playerUrl} target="_blank" rel="noreferrer" className="flex-1 text-xs text-blue-300 truncate">
+          {playerUrl}
+        </a>
+        <button
+          type="button"
+          onClick={() => navigator.clipboard.writeText(playerUrl)}
+          className="text-xs bg-white/10 rounded px-2 py-1 shrink-0"
+        >
+          複製連結
+        </button>
+      </div>
+      {canDelete && (
+        <button onClick={onDelete} className="text-xs text-rose-400 self-start">
+          刪除隊伍
+        </button>
+      )}
+    </div>
+  )
+}
+
+function TeamEditForm({
+  team,
+  token,
+  stations,
+  onDone,
+  onCancel,
+  onError,
+}: {
+  team: TeamAdminView
+  token: string
+  stations: Station[]
+  onDone: () => void
+  onCancel: () => void
+  onError: (m: string) => void
+}) {
+  const [name, setName] = useState(team.name)
+  const [color, setColor] = useState(team.color_hex)
+  const [meetingStationId, setMeetingStationId] = useState<number | ''>(team.meeting_station_id ?? '')
+  const [active, setActive] = useState(team.active)
+  const [pin, setPin] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  async function save(e: React.FormEvent) {
+    e.preventDefault()
+    setBusy(true)
+    try {
+      await api.updateTeam(token, team.id, {
+        name,
+        color_hex: color,
+        meeting_station_id: meetingStationId === '' ? null : Number(meetingStationId),
+        active,
+        ...(pin ? { admin_pin: pin } : {}),
+      })
+      onDone()
+    } catch (e: any) {
+      onError(e.message || '更新隊伍失敗')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <form onSubmit={save} className="bg-white/10 rounded-xl p-3 flex flex-col gap-2 ring-1 ring-white/20">
+      <p className="font-bold text-sm">編輯隊伍</p>
+      <input value={name} onChange={(e) => setName(e.target.value)} placeholder="隊名" required className="bg-white/10 rounded-lg px-3 py-2 text-sm" />
+      <div className="flex gap-2">
+        <input type="color" value={color} onChange={(e) => setColor(e.target.value)} className="h-10 w-14 bg-white/10 rounded-lg" />
+        <input
+          value={pin}
+          onChange={(e) => setPin(e.target.value)}
+          placeholder="重設 PIN 碼（留空則不變更）"
+          className="flex-1 bg-white/10 rounded-lg px-3 py-2 text-sm"
+        />
+      </div>
+      <StationSelect stations={stations} value={meetingStationId} onChange={setMeetingStationId} />
+      <label className="flex items-center gap-2 text-sm">
+        <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} />
+        隊伍啟用中（取消勾選 = 停用，保留紀錄但不計入排名/GPS）
+      </label>
+      <div className="flex gap-2">
+        <button disabled={busy} className="flex-1 bg-emerald-600 disabled:opacity-40 rounded-lg py-2 font-bold text-sm">
+          儲存
+        </button>
+        <button type="button" onClick={onCancel} className="flex-1 bg-white/10 rounded-lg py-2 font-bold text-sm">
+          取消
+        </button>
+      </div>
+    </form>
   )
 }
 
