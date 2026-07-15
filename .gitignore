@@ -1,4 +1,5 @@
 .env
+.claudeignore
 __pycache__/
 *.pyc
 .venv/

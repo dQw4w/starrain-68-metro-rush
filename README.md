@@ -51,9 +51,14 @@ station editor if precision matters for your event.
 Two things the old zoo-game version of this repo didn't need, and you will:
 
 1. **A real Postgres database.** Create a Supabase project and set
-   `DATABASE_URL` in `.env` to its **direct or session** connection string
-   (Project Settings → Database) — not the "Transaction pooler" string,
-   which is incompatible with `asyncpg`'s prepared statements.
+   `DATABASE_URL` to its **pooler** connection string (Project Settings →
+   Database → Connection string, host contains `pooler.supabase.com`), not
+   the "Direct connection" string (host `db.<ref>.supabase.co`) — the direct
+   string resolves IPv6-only, which most hosts (Render, Railway, etc.) can't
+   route to and fails at boot with `OSError: Network is unreachable`. Either
+   pooler mode ("Session" or "Transaction") works — `db.py` already sets
+   `statement_cache_size=0`, which is what the transaction pooler needs to
+   be compatible with `asyncpg`.
 2. **An always-on, internet-reachable host.** Unlike the old app (a laptop
    on venue WiFi was fine for a single-venue event), Metro Rush is a
    city-wide game — teams are on cellular data all over Taipei, not a
