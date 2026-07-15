@@ -2,7 +2,9 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { api } from '../api'
 import ActionLogList from '../components/ActionLogList'
+import GameClock from '../components/GameClock'
 import RankingBoard from '../components/RankingBoard'
+import { usePhase } from '../hooks/usePhase'
 import { useWebSocket, type WsEvent } from '../hooks/useWebSocket'
 import { clearAdminSession, loadAdminSession } from '../lib/adminSession'
 import type { ActionLogEntry, Challenge, GameConfig, TeamAdminView } from '../types'
@@ -20,6 +22,7 @@ export default function SuperAdminPage() {
   const [challenges, setChallenges] = useState<Challenge[]>([])
   const [log, setLog] = useState<ActionLogEntry[]>([])
   const [error, setError] = useState('')
+  const { phase, refetchPhase } = usePhase()
 
   useEffect(() => {
     if (!session || !session.is_super) navigate('/admin/login')
@@ -47,8 +50,9 @@ export default function SuperAdminPage() {
       if (['__connected__', 'map_update', 'ranking_update', 'team_update', 'challenge_pool', 'config_update'].includes(ev.type)) {
         refresh()
       }
+      if (ev.type === 'config_update') refetchPhase()
     },
-    [refresh]
+    [refresh, refetchPhase]
   )
   useWebSocket(getTicket, handleWsEvent)
 
@@ -61,11 +65,16 @@ export default function SuperAdminPage() {
 
   return (
     <div className="min-h-screen bg-slate-900 text-white flex flex-col">
-      <header className="flex items-center gap-3 px-4 py-3 bg-slate-800">
+      <header className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-3 bg-slate-800">
         <h1 className="font-black text-lg flex-1">Metro Rush｜總管理員</h1>
         <button onClick={logout} className="text-white/50 text-sm">
           登出
         </button>
+        {phase && (
+          <div className="w-full">
+            <GameClock phase={phase} />
+          </div>
+        )}
       </header>
 
       <nav className="flex bg-slate-800/60 overflow-x-auto">

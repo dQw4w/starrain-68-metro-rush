@@ -2,7 +2,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { api } from '../api'
 import ActionLogList from '../components/ActionLogList'
+import GameClock from '../components/GameClock'
 import MetroMap from '../components/MetroMap'
+import { usePhase } from '../hooks/usePhase'
 import { useWebSocket, type WsEvent } from '../hooks/useWebSocket'
 import { clearAdminSession, loadAdminSession } from '../lib/adminSession'
 import type { ActionLogEntry, ApprovalRequest, ChallengeTeaser, DevicePosition, MapData, TeamPublic } from '../types'
@@ -28,6 +30,7 @@ export default function TeamAdminPage() {
   const [challenges, setChallenges] = useState<ChallengeTeaser[]>([])
   const [tab, setTab] = useState<'queue' | 'log' | 'gps' | 'adjust'>('queue')
   const [error, setError] = useState('')
+  const { phase, refetchPhase } = usePhase()
 
   useEffect(() => {
     if (!session || (!session.is_super && session.team_id !== teamId)) {
@@ -69,8 +72,9 @@ export default function TeamAdminPage() {
       if (['admin_pending', 'team_update', 'gps_update'].includes(ev.type)) refresh()
       if (ev.type === 'map_update') api.getMap().then(setMapData)
       if (ev.type === 'challenge_pool') api.getActiveChallenges().then(setChallenges)
+      if (ev.type === 'config_update') refetchPhase()
     },
-    [refresh, teamId]
+    [refresh, teamId, refetchPhase]
   )
   useWebSocket(getTicket, handleWsEvent)
 
@@ -118,7 +122,7 @@ export default function TeamAdminPage() {
 
   return (
     <div className="min-h-screen bg-slate-900 text-white flex flex-col">
-      <header className="flex items-center gap-3 px-4 py-3 bg-slate-800">
+      <header className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-3 bg-slate-800">
         <span className="w-3.5 h-3.5 rounded-full" style={{ backgroundColor: teamInfo.color_hex }} />
         <h1 className="font-black text-lg flex-1">{teamInfo.name}｜隨隊管理員</h1>
         <span className="text-sm text-white/70">
@@ -127,6 +131,11 @@ export default function TeamAdminPage() {
         <button onClick={logout} className="text-white/50 text-sm">
           登出
         </button>
+        {phase && (
+          <div className="w-full">
+            <GameClock phase={phase} />
+          </div>
+        )}
       </header>
 
       <nav className="flex bg-slate-800/60 border-t border-white/10">

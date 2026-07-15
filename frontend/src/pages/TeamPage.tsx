@@ -4,6 +4,7 @@ import { api } from '../api'
 import ActionLogList from '../components/ActionLogList'
 import ChallengeModal from '../components/ChallengeModal'
 import ClaimSheet from '../components/ClaimSheet'
+import GameClock from '../components/GameClock'
 import MetroMap from '../components/MetroMap'
 import RankingBoard from '../components/RankingBoard'
 import { useWebSocket, type WsEvent } from '../hooks/useWebSocket'
@@ -62,6 +63,13 @@ export default function TeamPage() {
   useEffect(() => {
     refreshAll()
   }, [refreshAll])
+
+  // Safety net so a phase-boundary crossing (e.g. lunch break starting) is
+  // reflected even if nothing else happens to trigger a WS-driven refresh.
+  useEffect(() => {
+    const id = setInterval(refreshState, 20000)
+    return () => clearInterval(id)
+  }, [refreshState])
 
   const getTicket = useCallback(async () => {
     if (!token) throw new Error('no token')
@@ -146,11 +154,9 @@ export default function TeamPage() {
     await refreshAttempts()
   }
 
-  const phaseBanner = renderPhaseBanner(state.phase.phase)
-
   return (
     <div className="h-screen w-screen flex flex-col landscape:flex-row bg-slate-900 text-white overflow-hidden">
-      <header className="flex items-center gap-3 px-4 py-2.5 bg-slate-800/90 landscape:flex-col landscape:items-start landscape:w-64 landscape:h-full landscape:overflow-y-auto shrink-0 z-10">
+      <header className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-2.5 bg-slate-800/90 landscape:flex-col landscape:items-start landscape:w-64 landscape:h-full landscape:overflow-y-auto shrink-0 z-10">
         <div className="flex items-center gap-2 flex-1 landscape:w-full">
           <span className="w-3.5 h-3.5 rounded-full shrink-0" style={{ backgroundColor: myTeam.color_hex }} />
           <h1 className="font-black text-lg truncate">{myTeam.name}</h1>
@@ -158,7 +164,9 @@ export default function TeamPage() {
         <div className="text-right landscape:text-left landscape:w-full">
           <p className="font-bold tabular-nums">{myTeam.chips_balance} 枚代幣</p>
         </div>
-        {phaseBanner && <div className="landscape:w-full">{phaseBanner}</div>}
+        <div className="w-full landscape:w-full">
+          <GameClock phase={state.phase} />
+        </div>
         <nav className="hidden landscape:flex flex-col gap-1 w-full mt-2">
           <TabButton tab="ranking" current={tab} setTab={setTab} label="排名" />
           <TabButton tab="challenges" current={tab} setTab={setTab} label="任務" />
@@ -312,12 +320,4 @@ function StatusBadge({ attempt }: { attempt: ChallengeAttempt | undefined }) {
     pending_result: 'text-amber-300',
   }
   return <span className={`text-xs ${colors[attempt.status] || 'text-white/50'}`}>{labels[attempt.status]}</span>
-}
-
-function renderPhaseBanner(phase: string) {
-  if (phase === 'lunch_break') return <p className="text-amber-300 text-sm font-bold">🍱 午休時間，暫停所有操作</p>
-  if (phase === 'not_started') return <p className="text-white/50 text-sm font-bold">遊戲尚未開始</p>
-  if (phase === 'ended') return <p className="text-white/50 text-sm font-bold">遊戲已結束</p>
-  if (phase === 'paused') return <p className="text-rose-300 text-sm font-bold">遊戲已暫停</p>
-  return null
 }
