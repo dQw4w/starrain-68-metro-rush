@@ -2,7 +2,16 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from auth import AdminIdentity, require_superadmin
 from db import get_pool
-from models import Line, LineCreate, MapData, Station, StationClaim, StationCreate, StationUpdate
+from models import (
+    Line,
+    LineCreate,
+    LineStationOrderEntry,
+    MapData,
+    Station,
+    StationClaim,
+    StationCreate,
+    StationUpdate,
+)
 
 router = APIRouter(tags=["map"])
 
@@ -57,6 +66,30 @@ async def list_teams_public():
 
 
 # --- Superadmin geo data management -------------------------------------------------
+
+@router.get("/api/superadmin/line-station-order", response_model=dict[str, list[LineStationOrderEntry]])
+async def line_station_order(_: AdminIdentity = Depends(require_superadmin)):
+    """Ordered station list per line (id/name/coords/sequence) — used by the
+    line-waypoint editor to build the "adjacent station pair" picker; not
+    needed by any gameplay page (those just consume /api/map's line_paths)."""
+    pool = get_pool()
+    rows = await pool.fetch(
+        """
+        SELECT sl.line_id, sl.sequence, s.id AS station_id, s.name_zh, s.lat, s.lng
+        FROM station_lines sl
+        JOIN stations s ON s.id = sl.station_id
+        ORDER BY sl.line_id, sl.sequence
+        """
+    )
+    result: dict[str, list[LineStationOrderEntry]] = {}
+    for r in rows:
+        result.setdefault(str(r["line_id"]), []).append(
+            LineStationOrderEntry(
+                station_id=r["station_id"], name_zh=r["name_zh"],
+                lat=r["lat"], lng=r["lng"], sequence=r["sequence"],
+            )
+        )
+    return result
 
 @router.post("/api/superadmin/lines", response_model=Line)
 async def create_line(body: LineCreate, _: AdminIdentity = Depends(require_superadmin)):

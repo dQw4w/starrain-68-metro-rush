@@ -38,6 +38,14 @@ export interface MapData {
   line_paths: Record<string, [number, number][]>
 }
 
+export interface LineStationOrderEntry {
+  station_id: number
+  name_zh: string
+  lat: number
+  lng: number
+  sequence: number
+}
+
 export interface TeamPublic {
   id: number
   name: string

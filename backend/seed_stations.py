@@ -93,7 +93,14 @@ _Y_LINE_COORDS: dict[str, tuple[float, float]] = {
     "幸福": (25.048702, 121.459145), "新北產業園區": (25.061556, 121.459888),
 }
 
-_COORDS = {**_REAL_COORDS, **_Y_LINE_COORDS}
+# Manual corrections take priority over both dicts above, so you don't have to
+# go hunt down which one a station's original entry lives in — just paste
+# corrected coordinates here. Generate these with the super-admin "路線編輯"
+# tool's 車站座標 mode: pick a station, drag/click its marker to the right
+# spot, then use its 輸出 button to get a properly-formatted entry to paste.
+_COORD_OVERRIDES: dict[str, tuple[float, float]] = {}
+
+_COORDS = {**_REAL_COORDS, **_Y_LINE_COORDS, **_COORD_OVERRIDES}
 
 # Per-line ordered station name lists (order only drives the drawn polyline).
 _LINE_STATIONS: dict[str, list[str]] = {
@@ -146,99 +153,12 @@ _LINE_STATIONS: dict[str, list[str]] = {
 # using the exact names/order from _LINE_STATIONS above (from earlier in the
 # list to later); value is an ordered list of (lat, lng) points to insert
 # between them.
-_LINE_WAYPOINTS: dict[tuple[str, str, str], list[tuple[float, float]]] = {
-    # BR Line (Wenhu) - Adjusted based on OSM references
-    ("BR", "動物園", "木柵"): [
-        (24.9980, 121.5770), (24.9980, 121.5750)
-    ],
-    ("BR", "木柵", "萬芳社區"): [
-        (24.9982, 121.5710), (24.9985, 121.5695)
-    ],
-    ("BR", "萬芳社區", "萬芳醫院"): [
-        (24.9990, 121.5650), (24.9995, 121.5610)
-    ],
-    ("BR", "萬芳醫院", "辛亥"): [
-        (25.0010, 121.5565), (25.0030, 121.5555)
-    ],
-    ("BR", "辛亥", "麟光"): [
-        # Mountain tunnel complex curve, smoothed
-        (25.0080, 121.5550), (25.0120, 121.5555), (25.0160, 121.5575)
-    ],
-    ("BR", "麟光", "六張犁"): [(25.0200, 121.5580), (25.0215, 121.5560)],
-    ("BR", "六張犁", "科技大樓"): [(25.0245, 121.5505), (25.0252, 121.5470)],
-    ("BR", "科技大樓", "大安"): [(25.0280, 121.5435), (25.0305, 121.5435)],
-    ("BR", "大安", "忠孝復興"): [(25.0360, 121.5437), (25.0390, 121.5437)],
-    ("BR", "忠孝復興", "南京復興"): [(25.0450, 121.5437), (25.0485, 121.5436)],
-    ("BR", "南京復興", "中山國中"): [(25.0550, 121.5438), (25.0580, 121.5440)],
-    ("BR", "中山國中", "松山機場"): [
-        (25.0618, 121.5442), (25.0628, 121.5458), (25.0630, 121.5495)
-    ],
-    ("BR", "松山機場", "大直"): [
-        # Tunnel under Keelung River
-        (25.0650, 121.5515), (25.0700, 121.5510), (25.0750, 121.5505), (25.0780, 121.5495)
-    ],
-    ("BR", "大直", "劍南路"): [
-        # Sharp 90 degree turn north
-        (25.0805, 121.5540), (25.0815, 121.5550), (25.0830, 121.5555)
-    ],
-    ("BR", "劍南路", "西湖"): [(25.0848, 121.5580), (25.0835, 121.5620)],
-    ("BR", "港墘", "文德"): [(25.0792, 121.5800)],
-    ("BR", "文德", "內湖"): [
-        # Curve north
-        (25.0783, 121.5880), (25.0785, 121.5910), (25.0800, 121.5930), (25.0820, 121.5940)
-    ],
-    ("BR", "內湖", "大湖公園"): [
-        # Bows north around the lake
-        (25.0850, 121.5970), (25.0852, 121.5990), (25.0845, 121.6010)
-    ],
-    ("BR", "大湖公園", "葫洲"): [
-        # Curves south along road
-        (25.0820, 121.6040), (25.0790, 121.6060), (25.0760, 121.6070)
-    ],
-    ("BR", "葫洲", "東湖"): [
-        # Curve east
-        (25.0700, 121.6080), (25.0680, 121.6095)
-    ],
-    ("BR", "東湖", "南港軟體園區"): [
-        # Curve south across river
-        (25.0670, 121.6140), (25.0650, 121.6155), (25.0620, 121.6160)
-    ],
-
-    # R Line (Tamsui-Xinyi)
-    ("R", "圓山", "民權西路"): [(25.0665, 121.5198)],
-    ("R", "中山", "台北車站"): [(25.0490, 121.5195)],
-    ("R", "台北車站", "台大醫院"): [(25.0440, 121.5168)],
-    ("R", "台大醫院", "中正紀念堂"): [(25.0380, 121.5165)],
-    ("R", "士林", "劍潭"): [(25.0880, 121.5255)],
-    ("R", "奇岩", "唭哩岸"): [(25.1225, 121.5030)],
-
-    # G Line (Songshan-Xindian)
-    ("G", "公館", "台電大樓"): [(25.0180, 121.5300)],
-    ("G", "台電大樓", "古亭"): [(25.0235, 121.5255)],
-    ("G", "小南門", "西門"): [(25.0355, 121.5085)],
-    ("G", "西門", "北門"): [(25.0450, 121.5095)],
-    ("G", "北門", "中山"): [(25.0535, 121.5105)],
-    ("G", "南京三民", "松山"): [(25.0510, 121.5710)],
-
-    # BL Line (Bannan)
-    ("BL", "龍山寺", "西門"): [(25.0355, 121.5080)],
-    ("BL", "西門", "台北車站"): [(25.0468, 121.5086)],
-    ("BL", "台北車站", "善導寺"): [(25.0455, 121.5200)],
-    ("BL", "板橋", "新埔"): [(25.0180, 121.4650)],
-    ("BL", "江子翠", "龍山寺"): [(25.0320, 121.4850)],
-
-    # O Line (Zhonghe-Xinlu)
-    ("O", "頂溪", "古亭"): [(25.0180, 121.5180)],
-    ("O", "古亭", "東門"): [(25.0270, 121.5280)],
-    ("O", "東門", "忠孝新生"): [(25.0380, 121.5305)],
-    ("O", "大橋頭", "台北橋"): [(25.0630, 121.5050)],
-    ("O", "先嗇宮", "頭前庄"): [(25.0425, 121.4670)],
-
-    # Y Line (Circular)
-    ("Y", "大坪林", "十四張"): [(24.9825, 121.5350)],
-    ("Y", "板新", "板橋"): [(25.0135, 121.4670)],
-    ("Y", "頭前庄", "幸福"): [(25.0440, 121.4605)],
-}
+#
+# Generate these with the super-admin "路線編輯" (line waypoint editor) tool —
+# pick an adjacent station pair, click along the real curve on the map, then
+# use its 輸出 button to get properly-formatted entries to paste in here.
+# (Previously hand-guessed entries lived here and were inaccurate — removed.)
+_LINE_WAYPOINTS: dict[tuple[str, str, str], list[tuple[float, float]]] = {}
 
 
 async def seed(conn) -> None:

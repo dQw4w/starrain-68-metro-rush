@@ -3,13 +3,15 @@ import { Link, useNavigate } from 'react-router-dom'
 import { api } from '../api'
 import ActionLogList from '../components/ActionLogList'
 import GameClock from '../components/GameClock'
+import LineWaypointEditor from '../components/LineWaypointEditor'
 import RankingBoard from '../components/RankingBoard'
+import StationCoordEditor from '../components/StationCoordEditor'
 import { usePhase } from '../hooks/usePhase'
 import { useWebSocket, type WsEvent } from '../hooks/useWebSocket'
 import { clearAdminSession, loadAdminSession } from '../lib/adminSession'
 import type { ActionLogEntry, Challenge, GameConfig, MapData, Station, TeamAdminView } from '../types'
 
-type Tab = 'overview' | 'teams' | 'config' | 'challenges' | 'log'
+type Tab = 'overview' | 'teams' | 'config' | 'challenges' | 'waypoints' | 'log'
 
 export default function SuperAdminPage() {
   const navigate = useNavigate()
@@ -80,13 +82,13 @@ export default function SuperAdminPage() {
       </header>
 
       <nav className="flex bg-slate-800/60 overflow-x-auto">
-        {(['overview', 'teams', 'config', 'challenges', 'log'] as const).map((t) => (
+        {(['overview', 'teams', 'config', 'challenges', 'waypoints', 'log'] as const).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
             className={`px-4 py-2.5 text-sm font-bold whitespace-nowrap ${tab === t ? 'text-white bg-white/10' : 'text-white/50'}`}
           >
-            {{ overview: '總覽', teams: '隊伍', config: '賽事設定', challenges: '任務管理', log: '全域紀錄' }[t]}
+            {{ overview: '總覽', teams: '隊伍', config: '賽事設定', challenges: '任務管理', waypoints: '路線編輯', log: '全域紀錄' }[t]}
           </button>
         ))}
       </nav>
@@ -126,6 +128,8 @@ export default function SuperAdminPage() {
             onError={(m) => setError(m)}
           />
         )}
+
+        {tab === 'waypoints' && <GeoEditorTab token={token} />}
 
         {tab === 'log' && <ActionLogList entries={log} />}
       </main>
@@ -456,6 +460,29 @@ function ConfigTab({ config, onSave }: { config: GameConfig; onSave: (patch: Par
         儲存設定
       </button>
     </form>
+  )
+}
+
+function GeoEditorTab({ token }: { token: string }) {
+  const [mode, setMode] = useState<'stations' | 'waypoints'>('stations')
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex gap-2">
+        <button
+          onClick={() => setMode('stations')}
+          className={`text-sm font-bold rounded-lg px-3 py-1.5 ${mode === 'stations' ? 'bg-blue-600' : 'bg-white/10'}`}
+        >
+          車站座標
+        </button>
+        <button
+          onClick={() => setMode('waypoints')}
+          className={`text-sm font-bold rounded-lg px-3 py-1.5 ${mode === 'waypoints' ? 'bg-blue-600' : 'bg-white/10'}`}
+        >
+          路線波點
+        </button>
+      </div>
+      {mode === 'stations' ? <StationCoordEditor /> : <LineWaypointEditor token={token} />}
+    </div>
   )
 }
 

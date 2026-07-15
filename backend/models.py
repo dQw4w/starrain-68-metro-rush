@@ -135,6 +135,14 @@ class MapData(BaseModel):
     line_paths: dict[str, list[list[float]]]
 
 
+class LineStationOrderEntry(BaseModel):
+    station_id: int
+    name_zh: str
+    lat: float
+    lng: float
+    sequence: int
+
+
 # ---------------------------------------------------------------------------
 # Teams
 # ---------------------------------------------------------------------------

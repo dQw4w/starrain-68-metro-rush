@@ -7,6 +7,7 @@ import type {
   DevicePosition,
   GameConfig,
   GamePhase,
+  LineStationOrderEntry,
   LoginResponse,
   MapData,
   TeamAdminView,
@@ -132,6 +133,8 @@ export const api = {
       headers: authHeaders(token),
       body: JSON.stringify(body),
     }),
+  lineStationOrder: (token: string) =>
+    req<Record<string, LineStationOrderEntry[]>>('/superadmin/line-station-order', { headers: authHeaders(token) }),
 
   listAllChallenges: (token: string) => req<Challenge[]>('/superadmin/challenges', { headers: authHeaders(token) }),
   createChallenge: (token: string, body: Partial<Challenge>) =>
