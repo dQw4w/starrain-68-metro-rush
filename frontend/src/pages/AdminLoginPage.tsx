@@ -6,14 +6,21 @@ import { saveAdminSession } from '../lib/adminSession'
 export default function AdminLoginPage() {
   const navigate = useNavigate()
   const [role, setRole] = useState<'team' | 'super'>('team')
-  const [teams, setTeams] = useState<{ id: number; name: string; color_hex: string }[]>([])
+  const [teams, setTeams] = useState<{ id: number; name: string; color_hex: string }[] | null>(null)
+  const [teamsError, setTeamsError] = useState('')
   const [teamId, setTeamId] = useState<number | ''>('')
   const [pin, setPin] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
 
   useEffect(() => {
-    api.listTeamsPublic().then(setTeams).catch(() => {})
+    api
+      .listTeamsPublic()
+      .then((t) => {
+        setTeams(t)
+        setTeamsError('')
+      })
+      .catch((e: any) => setTeamsError(e.message || '無法載入隊伍清單'))
   }, [])
 
   async function handleSubmit(e: React.FormEvent) {
@@ -58,19 +65,27 @@ export default function AdminLoginPage() {
         </div>
 
         {role === 'team' && (
-          <select
-            value={teamId}
-            onChange={(e) => setTeamId(e.target.value === '' ? '' : Number(e.target.value))}
-            required
-            className="bg-white/10 rounded-lg px-3 py-2.5"
-          >
-            <option value="">選擇隊伍</option>
-            {teams.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name}
-              </option>
-            ))}
-          </select>
+          <>
+            <select
+              value={teamId}
+              onChange={(e) => setTeamId(e.target.value === '' ? '' : Number(e.target.value))}
+              required
+              className="bg-white/10 rounded-lg px-3 py-2.5"
+            >
+              <option value="">選擇隊伍</option>
+              {(teams || []).map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
+              ))}
+            </select>
+            {teamsError && <p className="text-rose-400 text-sm">隊伍清單載入失敗：{teamsError}</p>}
+            {!teamsError && teams && teams.length === 0 && (
+              <p className="text-amber-300 text-sm">
+                目前尚未建立任何隊伍，請先以「總管理員」登入並在「隊伍」頁籤新增隊伍。
+              </p>
+            )}
+          </>
         )}
 
         <input

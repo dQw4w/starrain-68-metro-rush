@@ -157,20 +157,37 @@ function TeamsTab({
   return (
     <div className="flex flex-col gap-4 max-w-xl">
       <div className="flex flex-col gap-2">
-        {teams.map((t) => (
-          <div key={t.id} className="bg-white/5 rounded-xl p-3 flex items-center gap-3">
-            <span className="w-3.5 h-3.5 rounded-full shrink-0" style={{ backgroundColor: t.color_hex }} />
-            <div className="flex-1">
-              <p className="font-bold">{t.name}</p>
-              <p className="text-xs text-white/50">
-                {t.stations_owned} 站 · {t.chips_balance} 枚 · 隊伍連結：/team/{t.share_token}
-              </p>
+        {teams.map((t) => {
+          const playerUrl = `${window.location.origin}/team/${t.share_token}`
+          return (
+          <div key={t.id} className="bg-white/5 rounded-xl p-3 flex flex-col gap-2">
+            <div className="flex items-center gap-3">
+              <span className="w-3.5 h-3.5 rounded-full shrink-0" style={{ backgroundColor: t.color_hex }} />
+              <div className="flex-1">
+                <p className="font-bold">{t.name}</p>
+                <p className="text-xs text-white/50">
+                  {t.stations_owned} 站 · {t.chips_balance} 枚
+                </p>
+              </div>
+              <Link to={`/admin/team/${t.id}`} className="bg-blue-600 rounded-lg px-3 py-1.5 text-sm font-bold">
+                進入審核
+              </Link>
             </div>
-            <Link to={`/admin/team/${t.id}`} className="bg-blue-600 rounded-lg px-3 py-1.5 text-sm font-bold">
-              進入審核
-            </Link>
+            <div className="flex items-center gap-2 bg-black/20 rounded-lg px-2 py-1.5">
+              <a href={playerUrl} target="_blank" rel="noreferrer" className="flex-1 text-xs text-blue-300 truncate">
+                {playerUrl}
+              </a>
+              <button
+                type="button"
+                onClick={() => navigator.clipboard.writeText(playerUrl)}
+                className="text-xs bg-white/10 rounded px-2 py-1 shrink-0"
+              >
+                複製連結
+              </button>
+            </div>
           </div>
-        ))}
+          )
+        })}
       </div>
 
       {!configLocked && (
