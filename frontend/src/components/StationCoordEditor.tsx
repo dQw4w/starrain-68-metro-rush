@@ -31,6 +31,7 @@ export default function StationCoordEditor() {
   const [mapData, setMapData] = useState<MapData | null>(null)
   const [progress, setProgress] = useState<Record<string, Point>>(() => loadProgress())
   const [selectedName, setSelectedName] = useState<string | null>(null)
+  const [selectedLineId, setSelectedLineId] = useState<number | ''>('')
   const [filter, setFilter] = useState('')
   const [error, setError] = useState('')
 
@@ -89,9 +90,11 @@ export default function StationCoordEditor() {
   const filteredStations = useMemo(() => {
     if (!mapData) return []
     const q = filter.trim()
-    const list = q ? mapData.stations.filter((s) => s.name_zh.includes(q)) : mapData.stations
-    return list.slice(0, 30)
-  }, [mapData, filter])
+    let list = mapData.stations
+    if (selectedLineId !== '') list = list.filter((s) => s.line_ids.includes(selectedLineId))
+    if (q) list = list.filter((s) => s.name_zh.includes(q))
+    return selectedLineId !== '' ? list : list.slice(0, 30)
+  }, [mapData, filter, selectedLineId])
 
   if (error) return <p className="text-rose-400 text-sm">{error}</p>
   if (!mapData) return <p className="text-white/50 text-sm">載入中…</p>
@@ -99,6 +102,18 @@ export default function StationCoordEditor() {
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap gap-2 items-center">
+        <select
+          value={selectedLineId}
+          onChange={(e) => setSelectedLineId(e.target.value ? Number(e.target.value) : '')}
+          className="bg-white/10 rounded-lg px-3 py-2 text-sm"
+        >
+          <option value="">所有路線</option>
+          {mapData.lines.map((l) => (
+            <option key={l.id} value={l.id}>
+              {l.name_zh} ({l.code})
+            </option>
+          ))}
+        </select>
         <input
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
