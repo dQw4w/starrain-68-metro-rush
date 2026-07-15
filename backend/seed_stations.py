@@ -1,16 +1,8 @@
-"""Seeds the real Taipei Metro (TRTC) network: 6 lines, ~131 stations.
+"""Seeds the real Taipei Metro (TRTC) network: 6 main lines, 3 branches, ~131 stations.
 
-Coordinates for 108 stations come from a real GIS source (leoluyi/taipei_mrt,
-itself derived from TRTC open data). The Circular Line (環狀線) opened in 2020,
-after that dataset was compiled, so its ~14 stations use hand-estimated
-coordinates based on their general New Taipei location — these are flagged
-below and should be corrected via the super-admin station editor once real
-coordinates are available. Station ordering within each line is a simplified
-sequence (used only to draw the connecting line on the map); three short
-branch spurs (新北投, 小碧潭, 小南門) are appended at the end of their line's
-list rather than spliced into the correct branch point, so the drawn polyline
-will show a small visual glitch there — the stations themselves are still
-correctly placed and tappable.
+Coordinates for stations come from a real GIS source (leoluyi/taipei_mrt,
+itself derived from TRTC open data). The Circular Line (環狀線) and 
+branch line definitions have been updated for correct rendering and topology.
 
 Run standalone with `python seed_stations.py`, or it runs automatically on
 backend startup if the `stations` table is empty.
@@ -21,12 +13,15 @@ from loguru import logger
 
 LINES = [
     # code, name_zh,      name_en,              color_hex, sort_order
-    ("R",  "淡水信義線", "Tamsui-Xinyi Line",  "#E3002C", 1),
-    ("BL", "板南線",     "Bannan Line",         "#0070BD", 2),
-    ("BR", "文湖線",     "Wenhu Line",          "#C48C31", 3),
-    ("O",  "中和新蘆線", "Zhonghe-Xinlu Line",  "#F8B61C", 4),
-    ("G",  "松山新店線", "Songshan-Xindian Line", "#008659", 5),
-    ("Y",  "環狀線",     "Circular Line",       "#FFD100", 6),
+    ("R",    "淡水信義線", "Tamsui-Xinyi Line",     "#E3002C", 1),
+    ("R_BR", "新北投支線", "Xinbeitou Branch",      "#FD92A3", 2),
+    ("BL",   "板南線",     "Bannan Line",           "#0070BD", 3),
+    ("BR",   "文湖線",     "Wenhu Line",            "#C48C31", 4),
+    ("O",    "中和新蘆線", "Zhonghe-Xinlu Line",    "#F8B61C", 5),
+    ("O_BR", "蘆洲支線",   "Luzhou Branch",         "#F8B61C", 6),
+    ("G",    "松山新店線", "Songshan-Xindian Line", "#008659", 7),
+    ("G_BR", "小碧潭支線", "Xiaobitan Branch",      "#CEE779", 8),
+    ("Y",    "環狀線",     "Circular Line",         "#FFD100", 9),
 ]
 
 # Real coordinates (lat, lng) from GIS open data, keyed by station name.
@@ -54,7 +49,7 @@ _REAL_COORDS: dict[str, tuple[float, float]] = {
     "大安": (25.032821, 121.543626), "大安森林公園": (25.033535, 121.535308),
     "大橋頭": (25.062922, 121.512849), "大湖公園": (25.083809, 121.602313),
     "大直": (25.080477, 121.548149), "奇岩": (25.125585, 121.501083),
-    "小南門": (25.035673, 121.510782), "小碧潭": (24.969554, 121.535298),
+    "小南門": (25.035673, 121.510782), "小碧潭": (24.973415, 121.530058),
     "市政府": (25.041179, 121.565259), "府中": (25.008935, 121.459219),
     "後山埤": (25.044279, 121.582004), "徐匯中學": (25.080742, 121.479616),
     "復興崗": (25.137447, 121.485208), "忠孝復興": (25.041602, 121.543794),
@@ -87,16 +82,16 @@ _REAL_COORDS: dict[str, tuple[float, float]] = {
     "麟光": (25.018523, 121.558827), "龍山寺": (25.035229, 121.501221),
 }
 
-# Circular Line — hand-estimated (real dataset predates this line, opened 2020).
-_ESTIMATED_COORDS: dict[str, tuple[float, float]] = {
-    "十四張": (24.9847, 121.5385), "秀朗橋": (24.9875, 121.5250),
-    "景平": (24.9950, 121.5150), "中和": (24.9975, 121.5080),
-    "橋和": (25.0010, 121.4970), "中原": (25.0055, 121.4870),
-    "板新": (25.0130, 121.4720), "新埔民生": (25.0270, 121.4600),
-    "幸福": (25.0430, 121.4530), "新北產業園區": (25.0650, 121.4480),
+# Circular Line (Y) — Corrected coordinates
+_Y_LINE_COORDS: dict[str, tuple[float, float]] = {
+    "十四張": (24.982260, 121.528430), "秀朗橋": (24.991823, 121.523555),
+    "景平": (24.993437, 121.516560), "中和": (25.002220, 121.499044),
+    "橋和": (25.004739, 121.490799), "中原": (25.007629, 121.484218),
+    "板新": (25.013532, 121.471676), "新埔民生": (25.026125, 121.466848),
+    "幸福": (25.048702, 121.459145), "新北產業園區": (25.061556, 121.459888),
 }
 
-_COORDS = {**_REAL_COORDS, **_ESTIMATED_COORDS}
+_COORDS = {**_REAL_COORDS, **_Y_LINE_COORDS}
 
 # Per-line ordered station name lists (order only drives the drawn polyline).
 _LINE_STATIONS: dict[str, list[str]] = {
@@ -104,7 +99,10 @@ _LINE_STATIONS: dict[str, list[str]] = {
         "淡水", "紅樹林", "竹圍", "關渡", "忠義", "復興崗", "北投", "奇岩", "唭哩岸",
         "石牌", "明德", "芝山", "士林", "劍潭", "圓山", "民權西路", "雙連", "中山",
         "台北車站", "台大醫院", "中正紀念堂", "東門", "大安森林公園", "大安",
-        "信義安和", "台北101/世貿", "象山", "新北投",
+        "信義安和", "台北101/世貿", "象山",
+    ],
+    "R_BR": [
+        "北投", "新北投",
     ],
     "BL": [
         "頂埔", "永寧", "土城", "海山", "亞東醫院", "府中", "板橋", "新埔", "江子翠",
@@ -120,17 +118,22 @@ _LINE_STATIONS: dict[str, list[str]] = {
     "O": [
         "南勢角", "景安", "永安市場", "頂溪", "古亭", "東門", "忠孝新生", "松江南京",
         "行天宮", "中山國小", "民權西路", "大橋頭", "台北橋", "菜寮", "三重", "先嗇宮",
-        "頭前庄", "徐匯中學", "三民高中", "蘆洲", "三重國小", "三和國中", "新莊",
-        "輔大", "丹鳳", "迴龍",
+        "頭前庄", "新莊", "輔大", "丹鳳", "迴龍",
+    ],
+    "O_BR": [
+        "大橋頭", "三重國小", "三和國中", "徐匯中學", "三民高中", "蘆洲",
     ],
     "G": [
-        "新店", "七張", "大坪林", "景美", "萬隆", "公館", "台電大樓", "古亭",
-        "中正紀念堂", "西門", "北門", "中山", "松江南京", "南京復興", "台北小巨蛋",
-        "南京三民", "松山", "小碧潭", "小南門",
+        "新店", "新店區公所", "七張", "大坪林", "景美", "萬隆", "公館", "台電大樓", "古亭",
+        "中正紀念堂", "小南門", "西門", "北門", "中山", "松江南京", "南京復興", "台北小巨蛋",
+        "南京三民", "松山",
+    ],
+    "G_BR": [
+        "七張", "小碧潭",
     ],
     "Y": [
-        "大坪林", "十四張", "秀朗橋", "景平", "中和", "橋和", "中原", "板新", "板橋",
-        "新埔民生", "頭前庄", "幸福", "新北產業園區",
+        "大坪林", "十四張", "秀朗橋", "景平", "景安", "中和", "橋和", "中原", "板新", 
+        "板橋", "新埔民生", "頭前庄", "幸福", "新北產業園區",
     ],
 }
 
