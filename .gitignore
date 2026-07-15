@@ -1,0 +1,9 @@
+.env
+__pycache__/
+*.pyc
+.venv/
+.pdm-python
+node_modules/
+backend/static/
+dist/
+.DS_Store

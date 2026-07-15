@@ -1,0 +1,31 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: metro_rush
+      POSTGRES_PASSWORD: metro_rush
+      POSTGRES_DB: metro_rush
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    restart: unless-stopped
+
+  app:
+    image: ${PROJECT_NAME}:${PROJECT_VERSION}
+    ports:
+      - "8001:8000"
+    env_file:
+      - .env
+    environment:
+      # Local/dev default: the compose 'db' service. Point this at your Supabase
+      # Postgres connection string instead for production (see .env.example) —
+      # use the "Session pooler" or direct connection string, not "Transaction
+      # pooler", since asyncpg's prepared statements don't work with it.
+      DATABASE_URL: ${DATABASE_URL:-postgresql://metro_rush:metro_rush@db:5432/metro_rush}
+    depends_on:
+      - db
+    restart: unless-stopped
+
+volumes:
+  db_data:

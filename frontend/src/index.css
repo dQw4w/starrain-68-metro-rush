@@ -1,0 +1,22 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: #0f172a;
+  color: white;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  overscroll-behavior: none;
+}
+
+/* Leaflet tiles must sit under our UI chrome but above the page background */
+.leaflet-container {
+  background: #0f172a;
+  font-family: inherit;
+}

@@ -1,0 +1,193 @@
+"""Seeds the real Taipei Metro (TRTC) network: 6 lines, ~131 stations.
+
+Coordinates for 108 stations come from a real GIS source (leoluyi/taipei_mrt,
+itself derived from TRTC open data). The Circular Line (環狀線) opened in 2020,
+after that dataset was compiled, so its ~14 stations use hand-estimated
+coordinates based on their general New Taipei location — these are flagged
+below and should be corrected via the super-admin station editor once real
+coordinates are available. Station ordering within each line is a simplified
+sequence (used only to draw the connecting line on the map); three short
+branch spurs (新北投, 小碧潭, 小南門) are appended at the end of their line's
+list rather than spliced into the correct branch point, so the drawn polyline
+will show a small visual glitch there — the stations themselves are still
+correctly placed and tappable.
+
+Run standalone with `python seed_stations.py`, or it runs automatically on
+backend startup if the `stations` table is empty.
+"""
+import asyncio
+
+from loguru import logger
+
+LINES = [
+    # code, name_zh,      name_en,              color_hex, sort_order
+    ("R",  "淡水信義線", "Tamsui-Xinyi Line",  "#E3002C", 1),
+    ("BL", "板南線",     "Bannan Line",         "#0070BD", 2),
+    ("BR", "文湖線",     "Wenhu Line",          "#C48C31", 3),
+    ("O",  "中和新蘆線", "Zhonghe-Xinlu Line",  "#F8B61C", 4),
+    ("G",  "松山新店線", "Songshan-Xindian Line", "#008659", 5),
+    ("Y",  "環狀線",     "Circular Line",       "#FFD100", 6),
+]
+
+# Real coordinates (lat, lng) from GIS open data, keyed by station name.
+_REAL_COORDS: dict[str, tuple[float, float]] = {
+    "七張": (24.975083, 121.542911), "三和國中": (25.076808, 121.486347),
+    "三民高中": (25.085670, 121.473241), "三重": (25.055599, 121.483947),
+    "三重國小": (25.069935, 121.497441), "中山": (25.052676, 121.520397),
+    "中山國中": (25.060806, 121.544216), "中山國小": (25.062651, 121.527664),
+    "中正紀念堂": (25.034274, 121.517049), "丹鳳": (25.028921, 121.422699),
+    "亞東醫院": (24.998589, 121.452649), "信義安和": (25.033150, 121.553233),
+    "先嗇宮": (25.046527, 121.472123), "內湖": (25.083506, 121.594206),
+    "公館": (25.014707, 121.534347), "六張犁": (25.023845, 121.553058),
+    "劍南路": (25.084898, 121.555607), "劍潭": (25.084236, 121.524969),
+    "動物園": (24.998277, 121.579325), "北投": (25.131907, 121.498591),
+    "北門": (25.049294, 121.510279), "南京三民": (25.051436, 121.564397),
+    "南京復興": (25.051870, 121.543577), "南勢角": (24.990409, 121.509173),
+    "南港": (25.052178, 121.607634), "南港展覽館": (25.054566, 121.617622),
+    "南港軟體園區": (25.059899, 121.615954), "古亭": (25.026886, 121.522568),
+    "台北101/世貿": (25.032979, 121.563490), "台北小巨蛋": (25.051647, 121.552003),
+    "台北橋": (25.062944, 121.499868), "台北車站": (25.046233, 121.517438),
+    "台電大樓": (25.020693, 121.528187), "唭哩岸": (25.120858, 121.506265),
+    "善導寺": (25.044813, 121.523340), "國父紀念館": (25.041347, 121.557689),
+    "圓山": (25.071380, 121.520132), "土城": (24.973226, 121.444452),
+    "士林": (25.093474, 121.526192), "大坪林": (24.982914, 121.541366),
+    "大安": (25.032821, 121.543626), "大安森林公園": (25.033535, 121.535308),
+    "大橋頭": (25.062922, 121.512849), "大湖公園": (25.083809, 121.602313),
+    "大直": (25.080477, 121.548149), "奇岩": (25.125585, 121.501083),
+    "小南門": (25.035673, 121.510782), "小碧潭": (24.969554, 121.535298),
+    "市政府": (25.041179, 121.565259), "府中": (25.008935, 121.459219),
+    "後山埤": (25.044279, 121.582004), "徐匯中學": (25.080742, 121.479616),
+    "復興崗": (25.137447, 121.485208), "忠孝復興": (25.041602, 121.543794),
+    "忠孝敦化": (25.041495, 121.549656), "忠孝新生": (25.042355, 121.532919),
+    "忠義": (25.130751, 121.473122), "文德": (25.078533, 121.584969),
+    "新北投": (25.136936, 121.502531), "新埔": (25.022996, 121.467987),
+    "新店": (24.957872, 121.537610), "新店區公所": (24.967394, 121.541299),
+    "新莊": (25.036148, 121.452318), "昆陽": (25.050189, 121.593020),
+    "明德": (25.109794, 121.518820), "景安": (24.993922, 121.505091),
+    "景美": (24.993178, 121.540921), "木柵": (24.998253, 121.573176),
+    "東湖": (25.067578, 121.611737), "東門": (25.033928, 121.528322),
+    "松山": (25.050002, 121.577733), "松山機場": (25.063104, 121.551635),
+    "松江南京": (25.052025, 121.533049), "板橋": (25.014297, 121.462882),
+    "民權西路": (25.062877, 121.519363), "永安市場": (25.002556, 121.511125),
+    "永寧": (24.967221, 121.436827), "永春": (25.040864, 121.575873),
+    "江子翠": (25.029905, 121.472237), "海山": (24.985548, 121.448875),
+    "淡水": (25.167993, 121.445258), "港墘": (25.079995, 121.575283),
+    "石牌": (25.114420, 121.515642), "科技大樓": (25.025992, 121.543451),
+    "竹圍": (25.136949, 121.459456), "紅樹林": (25.154114, 121.458955),
+    "台大醫院": (25.041827, 121.516220), "芝山": (25.102811, 121.522542),
+    "菜寮": (25.059648, 121.491138), "萬芳社區": (24.998608, 121.568067),
+    "萬芳醫院": (24.999504, 121.558029), "萬隆": (25.001965, 121.539002),
+    "葫洲": (25.072689, 121.607242), "蘆洲": (25.091564, 121.464357),
+    "行天宮": (25.057966, 121.533156), "西湖": (25.082161, 121.567212),
+    "西門": (25.042213, 121.508488), "象山": (25.032793, 121.570666),
+    "輔大": (25.032769, 121.435812), "辛亥": (25.005384, 121.557010),
+    "迴龍": (25.022517, 121.412663), "關渡": (25.125785, 121.467200),
+    "雙連": (25.057647, 121.520710), "頂埔": (24.959433, 121.418882),
+    "頂溪": (25.013619, 121.515450), "頭前庄": (25.039607, 121.461625),
+    "麟光": (25.018523, 121.558827), "龍山寺": (25.035229, 121.501221),
+}
+
+# Circular Line — hand-estimated (real dataset predates this line, opened 2020).
+_ESTIMATED_COORDS: dict[str, tuple[float, float]] = {
+    "十四張": (24.9847, 121.5385), "秀朗橋": (24.9875, 121.5250),
+    "景平": (24.9950, 121.5150), "中和": (24.9975, 121.5080),
+    "橋和": (25.0010, 121.4970), "中原": (25.0055, 121.4870),
+    "板新": (25.0130, 121.4720), "新埔民生": (25.0270, 121.4600),
+    "幸福": (25.0430, 121.4530), "新北產業園區": (25.0650, 121.4480),
+}
+
+_COORDS = {**_REAL_COORDS, **_ESTIMATED_COORDS}
+
+# Per-line ordered station name lists (order only drives the drawn polyline).
+_LINE_STATIONS: dict[str, list[str]] = {
+    "R": [
+        "淡水", "紅樹林", "竹圍", "關渡", "忠義", "復興崗", "北投", "奇岩", "唭哩岸",
+        "石牌", "明德", "芝山", "士林", "劍潭", "圓山", "民權西路", "雙連", "中山",
+        "台北車站", "台大醫院", "中正紀念堂", "東門", "大安森林公園", "大安",
+        "信義安和", "台北101/世貿", "象山", "新北投",
+    ],
+    "BL": [
+        "頂埔", "永寧", "土城", "海山", "亞東醫院", "府中", "板橋", "新埔", "江子翠",
+        "龍山寺", "西門", "台北車站", "善導寺", "忠孝新生", "忠孝復興", "忠孝敦化",
+        "國父紀念館", "市政府", "永春", "後山埤", "昆陽", "南港", "南港展覽館",
+    ],
+    "BR": [
+        "動物園", "木柵", "萬芳社區", "萬芳醫院", "辛亥", "麟光", "六張犁", "科技大樓",
+        "大安", "忠孝復興", "南京復興", "中山國中", "松山機場", "大直", "劍南路",
+        "西湖", "港墘", "文德", "內湖", "大湖公園", "葫洲", "東湖", "南港軟體園區",
+        "南港展覽館",
+    ],
+    "O": [
+        "南勢角", "景安", "永安市場", "頂溪", "古亭", "東門", "忠孝新生", "松江南京",
+        "行天宮", "中山國小", "民權西路", "大橋頭", "台北橋", "菜寮", "三重", "先嗇宮",
+        "頭前庄", "徐匯中學", "三民高中", "蘆洲", "三重國小", "三和國中", "新莊",
+        "輔大", "丹鳳", "迴龍",
+    ],
+    "G": [
+        "新店", "七張", "大坪林", "景美", "萬隆", "公館", "台電大樓", "古亭",
+        "中正紀念堂", "西門", "北門", "中山", "松江南京", "南京復興", "台北小巨蛋",
+        "南京三民", "松山", "小碧潭", "小南門",
+    ],
+    "Y": [
+        "大坪林", "十四張", "秀朗橋", "景平", "中和", "橋和", "中原", "板新", "板橋",
+        "新埔民生", "頭前庄", "幸福", "新北產業園區",
+    ],
+}
+
+
+async def seed(conn) -> None:
+    line_ids: dict[str, int] = {}
+    for code, name_zh, name_en, color_hex, sort_order in LINES:
+        row = await conn.fetchrow(
+            """INSERT INTO lines (code, name_zh, name_en, color_hex, sort_order)
+               VALUES ($1, $2, $3, $4, $5)
+               ON CONFLICT (code) DO UPDATE SET name_zh = EXCLUDED.name_zh
+               RETURNING id""",
+            code, name_zh, name_en, color_hex, sort_order,
+        )
+        line_ids[code] = row["id"]
+
+    station_ids: dict[str, int] = {}
+    for code, names in _LINE_STATIONS.items():
+        for seq, name in enumerate(names, start=1):
+            if name not in station_ids:
+                lat, lng = _COORDS[name]
+                row = await conn.fetchrow(
+                    "INSERT INTO stations (name_zh, name_en, lat, lng) VALUES ($1, $1, $2, $3) RETURNING id",
+                    name, lat, lng,
+                )
+                station_ids[name] = row["id"]
+                await conn.execute(
+                    "INSERT INTO station_claims (station_id, value) VALUES ($1, 0) ON CONFLICT DO NOTHING",
+                    row["id"],
+                )
+            await conn.execute(
+                """INSERT INTO station_lines (station_id, line_id, sequence)
+                   VALUES ($1, $2, $3)
+                   ON CONFLICT (station_id, line_id) DO UPDATE SET sequence = EXCLUDED.sequence""",
+                station_ids[name], line_ids[code], seq,
+            )
+
+    logger.info(f"Seeded {len(line_ids)} lines and {len(station_ids)} stations.")
+
+
+async def seed_if_empty(pool) -> None:
+    async with pool.acquire() as conn:
+        count = await conn.fetchval("SELECT COUNT(*) FROM stations")
+        if count > 0:
+            return
+        async with conn.transaction():
+            await seed(conn)
+
+
+if __name__ == "__main__":
+    import asyncpg
+    from config import DATABASE_URL
+
+    async def main():
+        conn = await asyncpg.connect(DATABASE_URL)
+        async with conn.transaction():
+            await seed(conn)
+        await conn.close()
+
+    asyncio.run(main())

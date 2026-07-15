@@ -1,0 +1,309 @@
+我欲重制的遊戲：
+
+Taiwan: Rail Rush is the 17th season of Jet Lag: The Game. It is played in Taiwan and features Michael Downie as a guest. The game started on December 5th at the Chiang Kai-Shek Memorial Hall in Taipei, and lasted for a maximum of 5 days.[1] The season was first teased on Nebula's twitter, Michael's Instagram Story and at other sources on the same day.[2]
+During the game design process for Snake Across South Korea, some kind of game for Taiwan was also being considered, but ended up not being used at the time.[3] One of the contestants has said that the season features more travel and sightseeing than most.
+
+
+Contents
+1	Gameplay
+2	Episodes
+3	Multimedia
+3.1	Gallery
+3.2	Videos
+4	References
+Gameplay
+Two teams race to claim as many of Taiwan's 243 train stations as possible, by visiting them and placing down chips. Chips are earned through secret challenges, and claimed stations can be stolen by placing more chips than the other team.[4]
+
+This season borrows the secret challenge element from Schengen Showdown, and the claiming-stealing mechanic from Au$tralia.
+
+Details of the game rules and mechanics include:
+
+The game runs from 7:30am - 5:30pm for 5 days. Both teams start in Taipei with 50 chips.
+To pass through a station they do not currently own, a team must deposit enough chips to claim the station (i.e., the station's current value + 1).
+However, they may not claim a station by more than 5 chips at a time.
+When passing through a station they own, a team may choose to deposit more chips on it, up to the aforementioned 5-chip limit.
+Each challenge has a known location and reward, but the details are only revealed upon reaching the location and deciding to attempt the challenge. Types of challenges include:
+Fixed reward - gives a certain number of chips if completed
+Variable reward - gives chips depending on the extent/difficulty chosen by the team (they must "call their shot" beforehand and succeed at their chosen goal to earn any chips)
+Steal - take a certain percentage of the other team's chips
+Multiplier - increase the team's chip balance by a certain percentage
+Like in Au$tralia and Schengen Showdown, challenges are failable. If a team fails a challenge, they may not reattempt it. The other team may attempt the challenge for a 50% higher reward.
+The map starts with 3 challenges. After a challenge is completed (or failed by both teams), it disappears from the map, and 2 new challenges are randomly generated (up to a maximum of 10 total).
+A team with a negative chip balance may continue to travel through enemy territory. However, they do not claim the stations they pass through, and they must pay the other team accordingly (i.e., not only do they continue to lose chips, but the other team gains that amount of chips).
+The win is determined by which team owns the most stations at 5:30pm on the last day.
+
+challenges(just for reference, will be designed in the future):
+Go Birdwatching In Da'an Park
+Da'an Park is an iconic birdwatching location in the heart of Taipei. Go to this sign, which lists 33 bird types that can be found in the park. One team member must attempt to memorize these birds. Once ready, the other team member will go photograph a bird, and then present it to the memorizer. The memorizer, without looking at the sign, gets one guess to successfully identify the bird. If they fail, they may reattempt once with a new bird.
+
+Reward: 30 chips
+
+
+
+
+The Floor is (Mostly) Lava
+Choose one team member to cross the Tofu Rocks.
+
+There is only one correct path to the other side, which they will have two minutes to memorize before they cross. Once they begin their attempt, if they step on the wrong rock-or deviate from the path in any way-they are incinerated and the challenge is failed.
+
+Reward: 40 chips; if challenge fails, the other team can earn 60 chips if successful
+
+
+
+
+Catvenger Hunt
+Once a rich coal mining town, Houtong is now best known for its massive population of stray cats.
+
+You have one hour to find and photograph all of the following cats:
+
+A cat that is asleep
+
+A cat that is eating
+
+A cat that is touching another cat
+
+A cat that is more than 15 feet from any other cat
+
+A cat that is above you
+
+No cat may be used in multiple pictures.
+
+Reward: 25 chips
+
+
+
+
+Be in the Hot Seat (Call Your Shot)
+You are now at one of Jiaoxi's many famous hot springs, but you aren't here to relax. You are in the hot seat.
+
+While in a hot spring, one team member must correctly answer as many trivia questions as they can in 60 seconds. Questions may be skipped, but can only be answered once. You can earn 8 chips (or 12 chips if challenge is failed and other team attempts it) per correctly answered question, but you must call your shot beforehand-if you do not reach the number of correct answers you predicted, you earn nothing and the challenge is failed. The question-asker can read the questions before you call your shot, but cannot discuss any specifics with their teammate.
+
+
+
+
+
+Let's Make a Deal
+You may have noticed three tall structures in this park: the Big Buddha and the two pagodas.
+
+You will complete this challenge by selecting the right one, and going to it. Which one is right? Head to this website to find out.
+
+Reward: 30 chips
+
+
+
+
+Taste Test Taiwanese McDonald's
+Taiwanese McDonald's has many exclusive items not available in America. Amy has secretly chosen one of them for you to try.
+
+One team member must taste-test this item blindfolded-only taking one bite-before correctly guessing what it is. They may consult the menu afterwards to make their guess.
+
+If they guess wrong, this challenge is failed.
+
+Reward: 30 chips
+
+
+
+
+Be Alone in the Xinying District
+Blurring strangers' faces is expensive. It's time to be alone. You must film one team memberfor 15 minutes straight with no other human beings or vehicles entering the frame.
+
+This team member must be at least 1/8 of a mile away from the camera, and the camera cannot be zoomed in at all. You get one attempt-if anyone else enters the frame after you start rolling, this challenge is failed.
+
+Reward: 50 chips
+
+
+
+
+Play Boba Blowdarts (Call Your Shot)
+Welcome to Chun Shui Tang, the teashop where bubble tea was invented. Order a small bubble tea and save the tapioca balls. Then, standing ten feet apart, one team member must blow the balls through a straw at the other team member, who must attempt to catch them in the cup.
+
+You can earn three chips per boba caught, but you must call your shot before you play. If you run out of boba before reaching your predicted number, then you earn nothing and this challenge is failed.
+
+
+
+
+
+See a Predictable Number of Monkeys (Call Your Shot)
+You are now at the base of Shoushan, otherwise known as Monkey Mountain. You have 40 minutes to ascend and explore the mountain, and you can earn two chips per monkey spotted.... but you must call your shot before you begin your ascent. Research is permitted.
+
+If you fail to spot as many monkeys as predicted, you earn nothing and this challenge is failed.
+
+
+
+
+
+Catch an animal eating.
+Welcome to Hsinchu Zoo.
+
+Within 20 minutes of entering the zoo, get footage of an animal eating.
+
+You may not feed the animal yourself, and may not consult any online feeding schedules. If you do not find any eating animal within 20 minutes, this challenge is failed.
+
+Reward: 55 chips
+
+
+
+
+Demonstrate Synesthesia.
+For the purposes of this game, each step on the rainbow steps will represent a different color. The bottom blue step will represent light blue, the middle will represent medium blue, the top will represent dark blue, and so on.
+
+One team member will be given a number of color assignments. For each, they have 30 seconds to think of one word to convey the right color to their partner. Their partner must go to the right step to put in their guess. They must successful get five out of seven or the challenge is failed.
+
+Reward: 50 chips
+
+
+
+
+Become a Spin-Top Champion.
+Taiwan has a long history of competitive top-spinning. You must construct your own spin-top using any materials you can find, and get the top to spin on its own for at least 30 seconds. You cannot use anything thar would be considered a spin-top.
+
+You may practice spinning your top for up to five seconds, but you only get one official attempt. If the top doesn't spin for at least 30 seconds, this challenge is failed.
+
+Reward: 45% multiplier of current team's chips
+
+
+
+
+Complete a Jellyfish Census (Steal)
+Go to the Jellyfish room at XPark Aquarium. One at a time, each team member will enter the Jellyfish room and have 15 minutes to count the total number of jellies in the room. No collusion or discussion about counting methods is permitted.
+
+Once both team members have their estimates, compare your answers. If the estimates are not within 25% of one another, this challenge is failed.
+
+Reward: Steal 45% of the other team's chips. If challenge fails, steal is worth 50%.
+
+
+
+
+Taste the Rainbow at Dawu Rainbow Village
+Years ago, Dawu revived their once-unknown village by painting it al the colors of the rainbow. Rather than just see it, though, you're going to taste it. One team member must acquire a food or drink to represent one of each of the rainbow's colors: red, orange, yellow, green, blue, violet.
+
+The other team member will then blind-taste all six of the foods in a randomly-generated order and guess what color each one represents. If any of their guesses are wrong, this challenge is failed.
+
+Reward: 70 chips
+
+
+
+
+Find this thing!! (Steal)
+Find this thing. You may not use your phone to navigate. If you don't find it within an hour, this challenge is failed.
+
+Reward: Steal 50% of the other team's chips.
+
+
+
+
+Keep Your Balance Across a Continental Plate (Call Your Shot)
+You are at the junction of Eurasian and Philippine Sea Plates marker. Collisions between these two plates are a common cause of earthquakes in Taiwan. You must keep your balance as you cross from one to the other. Acquire any number of standard size cans. Stack them on top of each other, holding only the can at the bottom. You must balance this stack of cans for a stretch of 200 feet from one continental plate to the other. You may practice, but you only get one attempt to complete the challenge. If any cans fall during your attempt, you earn nothing and this challenge is failed. Otherwise, you earn twenty chips per can.
+
+
+
+
+
+Win Crayon Mastermind
+Acquire some crayons. You will use these crayons to play a game of mastermind. You get one attempt of seven guesses -- otherwise the challenge is failed.
+
+Reward: 50 chips
+
+
+
+
+Get Your Qi Flowing at a River (Call Your Shot)
+In this challenge, you will attempt to meditate serenely by the river as you sense the passage of time.
+
+Choose an amount of time that you'd like to meditate; more time get you more chips.
+
+Then, one member must attempt to meditate for exactly that long, stopping the clock when they think they've reached the end of their timer.
+
+If they are more than a minute off, this challenge is failed and you earn nothing. Otherwise, you earn five chips per minute meditated. You may not practice.
+
+
+
+
+
+Find the Jet Laggers at the Chrysanthemum Festival
+Welcome to the Shilin Residence Chrysanthemum Festival, Taipei's largest autumnal flower festival.
+
+Without colluding, one team member must go photograph four art pieces in the festival, each corresponding to one of the four competitors in season 17. These photographs are then brought back to the other team member, who must correctly deduce which photo corresponds to which player. If they get any of the four wrong, the first team member must go back and try again with four new photos. Art pieces cannot be reused after a failed attempt.
+
+Reward: 60 chips
+
+
+
+
+Pitch a Painting
+Taichung's rainbow village is one of Taiwan's largest and longest-running art projects, originally painted to prevent the neighborhood's demolition in the 1950s.
+
+Amy has selected five paintings in the Taichung Rainbow Village and included photographs of them. One player will look at the photo, select one, and describe it to their partner.
+
+That partner must then go into Taichung Rainbow Village and find the painting. If they are mistaken, they may reattempt one time. Otherwise, the challenge is failed.
+
+Reward: 45% multiplier of current team's chips.
+
+
+
+
+Street Art Scavenger Hunt
+Weiwuying is famous for its massive, colorful street art murals.
+
+Amy has attached a list of characters she wants you to find, hidden somewhere in the neighborhood - you must find at least three of them.
+
+You have fifteen minutes.
+
+Reward: 40 chips
+
+
+
+
+Estimate the Diameter of the Hakka Roundhouse (Steal)
+The Hakka Round House is a perfect circle. Each teammate will take turns estimating the diameter of the Hakka Roundhouse, in feet, using nothing other than their body. You may choose to take either teammate's guess, or the mean average of the two, as your final guess.
+
+If your final guess is not within 20% of the true diameter, then this challenge is failed.
+
+Reward: Steal 40% of the other team's chips.
+
+
+
+
+Test Your Luck at the Dragon and Tiger Pagodas
+The dragon and tiger pagodas are one of the most popular tourist attractions in Kaohsiung. It's said that it's bad luck to enter through the tiger's mouth, and good luck to enter through the dragon.
+
+Team members must split up and make their way to the top of both pagodas, where they will play a game of rock-paper-scissors. The dragon player must win the game without any prior collusion.
+
+If the dragon player does not win, you must switch pagodas and wait 30 minutes to try again.
+
+Reward: 50 chips
+
+
+
+
+Observe the Observers (Steal)
+One team member must go to Taipei 101's observation deck or 89th floor indoor observatory. The other team member may go anywhere outside the building.
+
+Without any prior collusion, the team member on the observation deck must spot and photograph their teammate on the ground. From the time they begin their search, they have 5 minutes. If they do not photograph their teammate in 5 minutes, this challenge is failed.
+
+The player on the ground may send one photo of themselves, pointed straight down, but cannot provide any other clues.
+
+Reward: Steal 50% of the other team's chips.
+
+
+
+
+Discover Your Zodiac(s) (Call Your Shot)
+Using the pebbles on the beach, one team member will be making depictions of the 12 Chinese zodiac animals for their teammate to guess.
+
+Before creating any depictions, both team members must decide how many of the 12 they will be attempting, earning 12 chips per zodiac. The team member creating the depictions, however, will only have 50 total rocks-more zodiacs attempted means fewer rocks per depiction. These cannot take the form of letters or numbers.
+
+目前這個project是copy自另外一個無關的project，所以內容可以完全無視，但就是參考架構為主，可增可刪可改
+
+要改變的地方：
+1.遊戲名稱為metro-rush，使用台北捷運的路線與車站
+2.小隊數應該不止2個，可能為3個或4個，需要提供彈性調整設定的方式
+3.各小隊的集合車站可能不一樣
+4.每個小隊都有自己的頁面，裡面至少要有地圖（包含台北捷運的路線圖與車站，以及各任務的圖），log（紀錄各小隊的所有操作，可以有filter），剩餘的chips，即時的ranking（如果佔領車站數相同，tiebreaker為chips數），以及支援GPS定位），以及顯示小隊的名字
+5.每一個小隊都有一個admin會隨隊來隨時審核，所以每個admin也要有自己對應小隊的頁面（也要有一個總admin的頁面）
+6.佔領車站的方式為小隊員點選地圖上的車站，然後即時在該小隊的admin會pop出該操作的審核（就是是否允許這個操作），而不需以GPS做判斷
+7.任務的方式也就是只要有人點進任務開始解（各小隊員的頁面是共通的），admin會先審核是否允許開始任務，然後任務的敘述就會pop up在各小隊員的畫面，最後再由admin判斷是否成功
+8.steal任務的方式改為可自行指定要偷哪個小隊的
+9.任務也是每個小隊只能解一次，但有小隊失敗後的bonus改為有一小隊失敗+25%， 兩個小隊50%，三個小隊75%
+10.活動時間為1天，開始時間暫定9:00，結束時間暫定18:00，中間會有12:00~13:00一個小時的lunch break，於此時間禁止任何遊戲操作，且12:00所有人需於最近的車站停下，13:00後再返回該車站才能繼續遊戲
+11.大家會拿手機操作，請確保直與橫的UI都能正常運作
