@@ -59,8 +59,9 @@ export const api = {
   teamState: (token: string) => req<TeamState>(`/team/${token}/state`),
   teamLog: (token: string, actionType?: string) =>
     req<ActionLogEntry[]>(`/team/${token}/log${actionType ? `?action_type=${actionType}` : ''}`),
-  teamAction: (token: string, station_id: number, kind: 'claim' | 'topup') =>
-    req<any>(`/team/${token}/action`, { method: 'POST', body: JSON.stringify({ station_id, kind }) }),
+  teamAction: (token: string, station_id: number, kind: 'claim' | 'topup', amount: number) =>
+    req<any>(`/team/${token}/action`, { method: 'POST', body: JSON.stringify({ station_id, kind, amount }) }),
+  getPublicConfig: () => req<{ starting_chips: number; max_deposit_per_visit: number; fail_bonus_step_pct: number }>('/config/public'),
   challengeStart: (token: string, challengeId: number, body: { called_shot_value?: number; target_team_id?: number }) =>
     req<any>(`/team/${token}/challenge/${challengeId}/start`, { method: 'POST', body: JSON.stringify(body) }),
   challengeSubmitResult: (token: string, challengeId: number, achieved_value?: number) =>

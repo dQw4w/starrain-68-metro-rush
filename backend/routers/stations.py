@@ -7,6 +7,7 @@ from models import (
     LineCreate,
     LineStationOrderEntry,
     MapData,
+    PublicGameConfig,
     Station,
     StationClaim,
     StationCreate,
@@ -63,6 +64,17 @@ async def list_teams_public():
     pool = get_pool()
     rows = await pool.fetch("SELECT id, name, color_hex FROM teams WHERE active = TRUE ORDER BY id")
     return [dict(r) for r in rows]
+
+
+@router.get("/api/config/public", response_model=PublicGameConfig)
+async def public_game_config():
+    """Non-sensitive config fields team clients need to render UI (e.g. the
+    legal claim/top-up deposit range), without needing admin auth."""
+    pool = get_pool()
+    row = await pool.fetchrow(
+        "SELECT starting_chips, max_deposit_per_visit, fail_bonus_step_pct FROM game_config WHERE id = 1"
+    )
+    return PublicGameConfig(**dict(row))
 
 
 # --- Superadmin geo data management -------------------------------------------------

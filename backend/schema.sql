@@ -94,9 +94,20 @@ CREATE TABLE IF NOT EXISTS admin_sessions (
 CREATE TABLE IF NOT EXISTS station_claims (
     station_id INT PRIMARY KEY REFERENCES stations(id) ON DELETE CASCADE,
     owner_team_id INT REFERENCES teams(id),
-    value INT NOT NULL DEFAULT 0 CHECK (value >= 0 AND value <= 5),
+    value INT NOT NULL DEFAULT 0 CHECK (value >= 0),
+    -- Ceiling for `value` while the CURRENT owner holds this station, fixed at
+    -- (value of the previous owner at the moment of takeover) + max_deposit_per_visit.
+    -- Only a claim (ownership change) recomputes this; top-ups never touch it.
+    cap INT NOT NULL DEFAULT 5,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- station_claims.value previously had an upper bound of 5 baked into the
+-- CHECK constraint; the cap is now per-row (see `cap` above) and grows with
+-- each takeover, so any fixed upper bound has to come off existing rows too.
+ALTER TABLE station_claims DROP CONSTRAINT IF EXISTS station_claims_value_check;
+ALTER TABLE station_claims ADD CONSTRAINT station_claims_value_check CHECK (value >= 0);
+ALTER TABLE station_claims ADD COLUMN IF NOT EXISTS cap INT NOT NULL DEFAULT 5;
 
 CREATE TABLE IF NOT EXISTS challenges (
     id SERIAL PRIMARY KEY,

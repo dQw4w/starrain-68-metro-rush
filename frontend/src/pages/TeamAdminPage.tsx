@@ -223,6 +223,9 @@ function PendingCard({
         <span className="text-xs text-white/40">{new Date(req.created_at).toLocaleTimeString('zh-TW')}</span>
       </div>
       <p className="text-white/80 text-sm">{subject}</p>
+      {(req.kind === 'claim' || req.kind === 'topup') && req.requested_value?.amount != null && (
+        <p className="text-sm font-bold text-amber-300">投入枚數：{req.requested_value.amount} 枚</p>
+      )}
       {req.requested_value?.called_shot_value != null && (
         <p className="text-xs text-white/50">喊出數量：{req.requested_value.called_shot_value}</p>
       )}

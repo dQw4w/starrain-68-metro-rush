@@ -34,6 +34,7 @@ export default function TeamPage() {
   const [selectedStation, setSelectedStation] = useState<Station | null>(null)
   const [selectedChallenge, setSelectedChallenge] = useState<ChallengeTeaser | null>(null)
   const [challengeDetail, setChallengeDetail] = useState<Challenge | null>(null)
+  const [maxDepositPerVisit, setMaxDepositPerVisit] = useState(5)
 
   const refreshState = useCallback(async () => {
     if (!token) return
@@ -41,6 +42,10 @@ export default function TeamPage() {
   }, [token])
   const refreshMap = useCallback(async () => setMapData(await api.getMap()), [])
   const refreshChallenges = useCallback(async () => setChallenges(await api.getActiveChallenges()), [])
+  const refreshConfig = useCallback(async () => {
+    const cfg = await api.getPublicConfig()
+    setMaxDepositPerVisit(cfg.max_deposit_per_visit)
+  }, [])
   const refreshLog = useCallback(async () => {
     if (token) setLog(await api.teamLog(token))
   }, [token])
@@ -58,7 +63,8 @@ export default function TeamPage() {
     refreshLog()
     refreshGps()
     refreshAttempts()
-  }, [refreshState, refreshMap, refreshChallenges, refreshLog, refreshGps, refreshAttempts])
+    refreshConfig()
+  }, [refreshState, refreshMap, refreshChallenges, refreshLog, refreshGps, refreshAttempts, refreshConfig])
 
   useEffect(() => {
     refreshAll()
@@ -88,9 +94,12 @@ export default function TeamPage() {
       }
       if (ev.type === 'challenge_pool') refreshChallenges()
       if (ev.type === 'gps_update') refreshGps()
-      if (ev.type === 'config_update') refreshState()
+      if (ev.type === 'config_update') {
+        refreshState()
+        refreshConfig()
+      }
     },
-    [refreshAll, refreshMap, refreshState, refreshLog, refreshAttempts, refreshChallenges, refreshGps]
+    [refreshAll, refreshMap, refreshState, refreshLog, refreshAttempts, refreshChallenges, refreshGps, refreshConfig]
   )
   useWebSocket(getTicket, handleWsEvent)
 
@@ -135,9 +144,9 @@ export default function TeamPage() {
   )
   const selectedAttempt = myAttempts.find((a) => a.challenge_id === selectedChallenge?.id)
 
-  async function submitClaim(kind: 'claim' | 'topup') {
+  async function submitClaim(kind: 'claim' | 'topup', amount: number) {
     if (!token || !selectedStation) return
-    await api.teamAction(token, selectedStation.id, kind)
+    await api.teamAction(token, selectedStation.id, kind, amount)
     await refreshState()
   }
 
@@ -219,6 +228,7 @@ export default function TeamPage() {
           myTeamId={myTeam.id}
           teams={state.ranking}
           hasPendingRequest={!!pendingStationRequest}
+          maxDepositPerVisit={maxDepositPerVisit}
           onClose={() => setSelectedStation(null)}
           onSubmit={submitClaim}
         />

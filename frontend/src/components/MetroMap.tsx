@@ -62,7 +62,7 @@ export default function MetroMap({
                 <div style={{ fontWeight: 700 }}>{station.name_zh}</div>
                 {owner && (
                   <div>
-                    {owner.name} · {claim?.value} 枚代幣
+                    {owner.name} · {claim?.value} / {claim?.cap} 枚代幣
                   </div>
                 )}
               </div>

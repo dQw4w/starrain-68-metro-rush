@@ -27,6 +27,8 @@ export interface StationClaim {
   station_id: number
   owner_team_id: number | null
   value: number
+  /** Ceiling for `value` while the current owner holds this station; only a claim (ownership change) moves it. */
+  cap: number
   updated_at: string
 }
 

@@ -123,6 +123,7 @@ class StationClaim(BaseModel):
     station_id: int
     owner_team_id: Optional[int]
     value: int
+    cap: int
     updated_at: datetime
 
 
@@ -193,7 +194,14 @@ class TeamSelf(BaseModel):
 class ClaimRequestCreate(BaseModel):
     station_id: int
     kind: Literal["claim", "topup"]
+    amount: int
     requested_by: Optional[str] = None
+
+
+class PublicGameConfig(BaseModel):
+    starting_chips: int
+    max_deposit_per_visit: int
+    fail_bonus_step_pct: float
 
 
 class ApprovalRequestOut(BaseModel):

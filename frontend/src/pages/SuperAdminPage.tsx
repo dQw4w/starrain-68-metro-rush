@@ -439,7 +439,7 @@ function ConfigTab({ config, onSave }: { config: GameConfig; onSave: (patch: Par
       {field('lunch_start', '午休開始', 'time')}
       {field('lunch_end', '午休結束', 'time')}
       {field('starting_chips', '起始代幣', 'number')}
-      {field('max_deposit_per_visit', '單次最高投入', 'number')}
+      {field('max_deposit_per_visit', '佔領上限加值（新上限 = 原代幣數 + 此值）', 'number')}
       {field('fail_bonus_step_pct', '失敗加成 %/隊', 'number')}
       {field('challenge_pool_initial', '任務池初始數', 'number')}
       {field('challenge_pool_refill', '任務池補充數', 'number')}

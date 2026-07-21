@@ -99,8 +99,31 @@ async def _fire(events: list[tuple]) -> None:
 # Station claim / top-up / toll
 # ---------------------------------------------------------------------------
 
+def _deposit_bounds(kind: str, current_value: int, cap: int, bonus: int) -> tuple[int, int]:
+    """Legal range for the `amount` field of a claim/top-up against a station
+    currently at `current_value`.
+
+    A station's ceiling isn't a flat constant — every time it's *claimed*
+    (ownership changes), the incoming team gets a fresh ceiling of
+    `current_value + bonus` (bonus = game_config.max_deposit_per_visit),
+    regardless of how much headroom the outgoing owner had left unused. That
+    new ceiling is frozen (the `cap` column) for as long as the same team
+    keeps owning the station — top-ups never move it, only the next claim does.
+
+    - claim:  `amount` is the new absolute station value (sunk-cost model —
+      the outgoing owner's chips are simply overwritten, not added to).
+      Range: [current_value + 1, current_value + bonus].
+    - topup:  `amount` is chips *added* on top of the current value (it's
+      your own station, nothing is being overwritten).
+      Range: [1, cap - current_value].
+    """
+    if kind == "claim":
+        return (current_value + 1, current_value + bonus)
+    return (1, cap - current_value)
+
+
 async def create_action_request(team_id: int, station_id: int, kind: str,
-                                  requested_by: str | None, amount: int | None = None) -> dict:
+                                  requested_by: str | None, amount: int) -> dict:
     await assert_active_phase()
     pool = get_pool()
     result: dict = {}
@@ -126,8 +149,11 @@ async def create_action_request(team_id: int, station_id: int, kind: str,
                     raise HTTPException(status_code=400, detail="只能對己方車站加碼")
                 if kind == "claim" and claim["owner_team_id"] == team_id:
                     raise HTTPException(status_code=400, detail="此車站已為己方所有，請使用加碼")
-                if claim["value"] >= cfg["max_deposit_per_visit"]:
-                    raise HTTPException(status_code=400, detail="此車站代幣數已達上限，無法再變動")
+                # Only top-ups are ever "maxed out" — a claim always gets a fresh
+                # ceiling relative to the current value, so a rival team can
+                # always take a station away no matter how high its value is.
+                if kind == "topup" and claim["value"] >= claim["cap"]:
+                    raise HTTPException(status_code=400, detail="此車站代幣數已達目前上限，無法再加碼")
 
                 if kind == "claim" and claim["owner_team_id"] is not None and team["chips_balance"] < 0:
                     # Negative-balance team passing through enemy territory: deterministic
@@ -151,11 +177,17 @@ async def create_action_request(team_id: int, station_id: int, kind: str,
                         ("broadcast_global", "ranking_update"),
                     ]
                 else:
+                    min_amount, max_amount = _deposit_bounds(kind, claim["value"], claim["cap"], cfg["max_deposit_per_visit"])
+                    if not (min_amount <= amount <= max_amount):
+                        raise HTTPException(
+                            status_code=400,
+                            detail=f"投入枚數需介於 {min_amount} 到 {max_amount} 之間",
+                        )
                     req = await conn.fetchrow(
                         """INSERT INTO approval_requests (kind, team_id, station_id, requested_by, requested_value, status)
                            VALUES ($1, $2, $3, $4, $5, 'pending') RETURNING *""",
                         kind, team_id, station_id, requested_by,
-                        json.dumps({"station_value": claim["value"], "owner_team_id": claim["owner_team_id"]}),
+                        json.dumps({"station_value": claim["value"], "owner_team_id": claim["owner_team_id"], "amount": amount}),
                     )
                     result = {"status": "pending", "request": dict(req)}
                     events = [("notify_admin", team_id, "admin_pending")]
@@ -190,10 +222,18 @@ async def resolve_action_request(request_id: int, admin_id: int, approve: bool) 
                 claim = await conn.fetchrow("SELECT * FROM station_claims WHERE station_id = $1 FOR UPDATE", req["station_id"])
                 cfg = await conn.fetchrow("SELECT * FROM game_config WHERE id = 1")
 
+                rv = req["requested_value"]
+                if isinstance(rv, str):
+                    rv = json.loads(rv)
+                amount = rv.get("amount")
+                min_amount, max_amount = _deposit_bounds(req["kind"], claim["value"], claim["cap"], cfg["max_deposit_per_visit"])
+
                 stale = (
                     (req["kind"] == "topup" and claim["owner_team_id"] != req["team_id"])
                     or (req["kind"] == "claim" and claim["owner_team_id"] == req["team_id"])
-                    or claim["value"] >= cfg["max_deposit_per_visit"]
+                    or (req["kind"] == "topup" and claim["value"] >= claim["cap"])
+                    or amount is None
+                    or not (min_amount <= amount <= max_amount)
                 )
                 if stale:
                     await conn.execute(
@@ -203,21 +243,36 @@ async def resolve_action_request(request_id: int, admin_id: int, approve: bool) 
                     result = {"status": "stale"}
                     events = [("notify_admin", req["team_id"], "admin_pending")]
                 else:
-                    deposit = claim["value"] + 1  # authoritative recompute — never trust the tap-time snapshot
+                    deposit = amount  # what the team actually pays — never trust the tap-time snapshot blindly
                     new_owner = req["team_id"]
                     prev_owner = claim["owner_team_id"]
 
+                    if req["kind"] == "claim":
+                        # Sunk-cost model: the outgoing owner's chips are simply
+                        # overwritten, and the incoming owner gets a fresh ceiling
+                        # based on how much the outgoing owner had accumulated.
+                        new_value = amount
+                        new_cap = claim["value"] + cfg["max_deposit_per_visit"]
+                        await conn.execute(
+                            "UPDATE station_claims SET owner_team_id = $1, value = $2, cap = $3, updated_at = now() WHERE station_id = $4",
+                            new_owner, new_value, new_cap, req["station_id"],
+                        )
+                    else:
+                        # Top-up: additive, and the station's ceiling for this
+                        # owner never moves — only a future claim resets it.
+                        new_value = claim["value"] + amount
+                        await conn.execute(
+                            "UPDATE station_claims SET value = $1, updated_at = now() WHERE station_id = $2",
+                            new_value, req["station_id"],
+                        )
+
                     team = await conn.fetchrow("SELECT chips_balance FROM teams WHERE id = $1 FOR UPDATE", new_owner)
                     await conn.execute("UPDATE teams SET chips_balance = chips_balance - $1 WHERE id = $2", deposit, new_owner)
-                    await conn.execute(
-                        "UPDATE station_claims SET owner_team_id = $1, value = $2, updated_at = now() WHERE station_id = $3",
-                        new_owner, deposit, req["station_id"],
-                    )
                     new_balance = team["chips_balance"] - deposit
                     action_label = "佔領" if req["kind"] == "claim" else "加碼"
                     await _log(conn, new_owner, "team", req["kind"], station_id=req["station_id"],
                                chip_delta=-deposit, resulting_balance=new_balance,
-                               message=f"{action_label}車站，投入 {deposit} 枚代幣")
+                               message=f"{action_label}車站，投入 {deposit} 枚代幣（車站代幣數：{new_value}）")
                     await conn.execute(
                         "UPDATE approval_requests SET status = 'approved', resolved_by = $1, resolved_at = now() WHERE id = $2",
                         admin_id, request_id,

@@ -90,7 +90,7 @@ async def team_log(token: str, action_type: str | None = Query(default=None), li
 @router.post("/action", response_model=dict)
 async def team_action(token: str, body: ClaimRequestCreate):
     team = await _team_by_token(token)
-    return await create_action_request(team["id"], body.station_id, body.kind, body.requested_by)
+    return await create_action_request(team["id"], body.station_id, body.kind, body.requested_by, body.amount)
 
 
 @router.post("/challenge/{challenge_id}/start", response_model=dict)
