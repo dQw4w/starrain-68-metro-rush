@@ -1,12 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import { api } from '../api'
 import ActionLogList from '../components/ActionLogList'
 import GameClock from '../components/GameClock'
 import MetroMap from '../components/MetroMap'
 import { usePhase } from '../hooks/usePhase'
 import { useWebSocket, type WsEvent } from '../hooks/useWebSocket'
-import { clearAdminSession, loadAdminSession } from '../lib/adminSession'
 import type { ActionLogEntry, ApprovalRequest, ChallengeTeaser, DevicePosition, MapData, TeamPublic } from '../types'
 
 const KIND_LABELS: Record<string, string> = {
@@ -16,12 +15,19 @@ const KIND_LABELS: Record<string, string> = {
   challenge_result: '任務結果判定',
 }
 
+/**
+ * URL is /admin/team/:idOrToken where idOrToken is a team's permanent
+ * admin_share_token — the token itself is the credential (like a team
+ * player's share_token), so this page needs no login/session of its own.
+ * The super admin's own "進入審核" link uses the exact same token, so there's
+ * nothing to branch on here.
+ */
 export default function TeamAdminPage() {
-  const { teamId: teamIdParam } = useParams<{ teamId: string }>()
-  const teamId = Number(teamIdParam)
-  const navigate = useNavigate()
-  const session = loadAdminSession()
+  const { idOrToken } = useParams<{ idOrToken: string }>()
+  const token = idOrToken || ''
 
+  const [teamId, setTeamId] = useState<number | null>(null)
+  const [linkError, setLinkError] = useState('')
   const [teamInfo, setTeamInfo] = useState<TeamPublic | null>(null)
   const [pending, setPending] = useState<ApprovalRequest[]>([])
   const [log, setLog] = useState<ActionLogEntry[]>([])
@@ -32,8 +38,13 @@ export default function TeamAdminPage() {
   const [error, setError] = useState('')
   const { phase, refetchPhase } = usePhase()
 
-  const unauthorized = !session || (!session.is_super && session.team_id !== teamId)
-  const token = session?.token || ''
+  useEffect(() => {
+    if (!token) return
+    api
+      .resolveAdminLink(token)
+      .then((r) => setTeamId(r.team_id))
+      .catch((e: any) => setLinkError(e.message || '此連結無效或已被停用'))
+  }, [token])
 
   const refresh = useCallback(async () => {
     if (!token || !teamId) return
@@ -50,10 +61,11 @@ export default function TeamAdminPage() {
   }, [token, teamId])
 
   useEffect(() => {
+    if (!teamId) return
     refresh()
     api.getMap().then(setMapData).catch(() => {})
     api.getActiveChallenges().then(setChallenges).catch(() => {})
-  }, [refresh])
+  }, [teamId, refresh])
 
   const getTicket = useCallback(async () => {
     if (!token) throw new Error('not logged in')
@@ -85,6 +97,7 @@ export default function TeamAdminPage() {
   }, [challenges])
 
   async function handleApprove(req: ApprovalRequest, body?: { success: boolean; achieved_value?: number }) {
+    if (!teamId) return
     try {
       await api.adminApprove(token, teamId, req.id, body)
       refresh()
@@ -94,6 +107,7 @@ export default function TeamAdminPage() {
   }
 
   async function handleDeny(req: ApprovalRequest) {
+    if (!teamId) return
     try {
       await api.adminDeny(token, teamId, req.id)
       refresh()
@@ -102,20 +116,11 @@ export default function TeamAdminPage() {
     }
   }
 
-  function logout() {
-    clearAdminSession()
-    if (session?.is_super) {
-      navigate('/admin/login')
-    } else {
-      window.location.reload()
-    }
-  }
-
-  if (unauthorized) {
+  if (linkError) {
     return (
       <div className="h-screen flex flex-col items-center justify-center gap-2 bg-slate-900 text-white text-center px-6">
-        <p className="font-bold">此頁面需要隨隊管理員專屬連結才能訪問</p>
-        <p className="text-white/50 text-sm">請向總管理員索取貴隊的管理連結，或確認連結是否正確。</p>
+        <p className="font-bold text-rose-400">{linkError}</p>
+        <p className="text-white/50 text-sm">請向總管理員確認連結是否正確或已更新。</p>
       </div>
     )
   }
@@ -136,9 +141,6 @@ export default function TeamAdminPage() {
         <span className="text-sm text-white/70">
           {teamInfo.stations_owned} 站 · {teamInfo.chips_balance} 枚
         </span>
-        <button onClick={logout} className="text-white/50 text-sm">
-          登出
-        </button>
         {phase && (
           <div className="w-full">
             <GameClock phase={phase} />
@@ -192,6 +194,7 @@ export default function TeamAdminPage() {
         )}
 
         {tab === 'adjust' && <AdjustChipsForm onSubmit={async (delta, reason) => {
+          if (!teamId) return
           await api.adminAdjustChips(token, teamId, delta, reason)
           refresh()
         }} />}

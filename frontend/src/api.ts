@@ -48,8 +48,7 @@ export const api = {
 
   // --- Auth ---
   login: (pin: string) => req<LoginResponse>('/auth/login', { method: 'POST', body: JSON.stringify({ pin }) }),
-  loginByLink: (adminToken: string) =>
-    req<LoginResponse>(`/auth/login-link/${adminToken}`, { method: 'POST' }),
+  resolveAdminLink: (adminToken: string) => req<{ team_id: number }>(`/auth/resolve-admin-link/${adminToken}`),
   logout: (token: string) =>
     req<{ ok: boolean }>('/auth/logout', { method: 'POST', headers: authHeaders(token) }),
   adminWsTicket: (token: string) =>

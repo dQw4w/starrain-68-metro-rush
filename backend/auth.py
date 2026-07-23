@@ -72,11 +72,26 @@ async def resolve_session(token: str) -> Optional[AdminIdentity]:
     return AdminIdentity(row["id"], row["team_id"], row["display_name"])
 
 
+async def resolve_admin_link(token: str) -> Optional[AdminIdentity]:
+    """A team admin's admin_share_token is itself a permanent credential — no
+    session, no expiry, no exchange step. Whoever holds the link has access,
+    exactly like a team player's share_token. Only ever resolves a team-scoped
+    admin (never the super admin, who always uses PIN + a real session)."""
+    pool = get_pool()
+    row = await pool.fetchrow(
+        "SELECT id, team_id, display_name FROM admins WHERE admin_share_token = $1 AND team_id IS NOT NULL",
+        token,
+    )
+    if row is None:
+        return None
+    return AdminIdentity(row["id"], row["team_id"], row["display_name"])
+
+
 async def get_current_admin(authorization: str = Header(default="")) -> AdminIdentity:
     if not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Missing bearer token")
     token = authorization.removeprefix("Bearer ").strip()
-    identity = await resolve_session(token)
+    identity = await resolve_session(token) or await resolve_admin_link(token)
     if identity is None:
         raise HTTPException(status_code=401, detail="Invalid or expired session")
     return identity

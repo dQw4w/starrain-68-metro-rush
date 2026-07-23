@@ -284,7 +284,7 @@ function TeamRow({
   canDelete: boolean
 }) {
   const playerUrl = `${window.location.origin}/team/${team.share_token}`
-  const adminUrl = `${window.location.origin}/admin/link/${team.admin_share_token}`
+  const adminUrl = `${window.location.origin}/admin/team/${team.admin_share_token}`
   return (
     <div className={`bg-white/5 rounded-xl p-3 flex flex-col gap-2 ${!team.active ? 'opacity-50' : ''}`}>
       <div className="flex items-center gap-3">
@@ -301,7 +301,7 @@ function TeamRow({
         <button onClick={onEdit} className="bg-white/10 rounded-lg px-3 py-1.5 text-sm font-bold">
           編輯
         </button>
-        <Link to={`/admin/team/${team.id}`} className="bg-blue-600 rounded-lg px-3 py-1.5 text-sm font-bold">
+        <Link to={`/admin/team/${team.admin_share_token}`} className="bg-blue-600 rounded-lg px-3 py-1.5 text-sm font-bold">
           進入審核
         </Link>
       </div>
