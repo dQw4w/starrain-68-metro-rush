@@ -111,10 +111,14 @@ async def team_gps(team_id: int, admin: AdminIdentity = Depends(get_current_admi
 @router.get("/log", response_model=list[ActionLogEntry])
 async def team_log(team_id: int, limit: int = Query(default=300, le=1000),
                     admin: AdminIdentity = Depends(get_current_admin)):
+    # assert_team_scope still gates *access* to this admin surface; the log
+    # content itself is global (every team's actions), same as the team view.
     assert_team_scope(admin, team_id)
     pool = get_pool()
     rows = await pool.fetch(
-        "SELECT * FROM action_log WHERE team_id = $1 ORDER BY created_at DESC LIMIT $2", team_id, limit
+        """SELECT al.*, t.name AS team_name FROM action_log al JOIN teams t ON t.id = al.team_id
+           ORDER BY al.created_at DESC LIMIT $1""",
+        limit,
     )
     return [ActionLogEntry(**dict(r)) for r in rows]
 
@@ -129,12 +133,17 @@ async def adjust_chips(team_id: int, body: AdjustChipsBody, admin: AdminIdentity
             if team is None:
                 raise HTTPException(status_code=404, detail="找不到此隊伍")
             new_balance = team["chips_balance"] + body.delta
+            adjust_msg = f"管理員調整代幣：{body.reason}"
             await conn.execute("UPDATE teams SET chips_balance = $1 WHERE id = $2", new_balance, team_id)
             await conn.execute(
                 """INSERT INTO action_log (team_id, actor, action_type, chip_delta, resulting_balance, message)
                    VALUES ($1, $2, 'admin_adjust', $3, $4, $5)""",
-                team_id, admin.display_name, body.delta, new_balance, f"管理員調整代幣：{body.reason}",
+                team_id, admin.display_name, body.delta, new_balance, adjust_msg,
             )
     await manager.notify_team(team_id, "team_update")
     await manager.broadcast_global("ranking_update")
+    await manager.broadcast_global(
+        "activity_log", team_id=team_id, team_name=team["name"], action_type="admin_adjust",
+        message=adjust_msg, chip_delta=body.delta,
+    )
     return {"ok": True, "chips_balance": new_balance}

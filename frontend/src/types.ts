@@ -148,6 +148,7 @@ export interface ChallengeAttempt {
 export interface ActionLogEntry {
   id: number
   team_id: number
+  team_name: string
   actor: string
   action_type: string
   station_id: number | null

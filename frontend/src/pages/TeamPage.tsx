@@ -7,6 +7,7 @@ import ClaimSheet from '../components/ClaimSheet'
 import GameClock from '../components/GameClock'
 import MetroMap from '../components/MetroMap'
 import RankingBoard from '../components/RankingBoard'
+import ToastStack, { useToastQueue } from '../components/ToastStack'
 import { useWebSocket, type WsEvent } from '../hooks/useWebSocket'
 import { getDeviceId } from '../lib/adminSession'
 import type {
@@ -35,6 +36,7 @@ export default function TeamPage() {
   const [selectedChallenge, setSelectedChallenge] = useState<ChallengeTeaser | null>(null)
   const [challengeDetail, setChallengeDetail] = useState<Challenge | null>(null)
   const [maxDepositPerVisit, setMaxDepositPerVisit] = useState(5)
+  const { toasts, push: pushToast } = useToastQueue()
 
   const refreshState = useCallback(async () => {
     if (!token) return
@@ -98,8 +100,11 @@ export default function TeamPage() {
         refreshState()
         refreshConfig()
       }
+      if (ev.type === 'activity_log') {
+        pushToast({ team_name: ev.team_name, message: ev.message, chip_delta: ev.chip_delta })
+      }
     },
-    [refreshAll, refreshMap, refreshState, refreshLog, refreshAttempts, refreshChallenges, refreshGps, refreshConfig]
+    [refreshAll, refreshMap, refreshState, refreshLog, refreshAttempts, refreshChallenges, refreshGps, refreshConfig, pushToast]
   )
   useWebSocket(getTicket, handleWsEvent)
 
@@ -165,6 +170,7 @@ export default function TeamPage() {
 
   return (
     <div className="h-screen w-screen flex flex-col landscape:flex-row bg-slate-900 text-white overflow-hidden">
+      <ToastStack toasts={toasts} />
       <header className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-2.5 bg-slate-800/90 landscape:flex-col landscape:items-start landscape:w-64 landscape:h-full landscape:overflow-y-auto shrink-0 z-10">
         <div className="flex items-center gap-2 flex-1 landscape:w-full">
           <span className="w-3.5 h-3.5 rounded-full shrink-0" style={{ backgroundColor: myTeam.color_hex }} />

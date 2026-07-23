@@ -9,6 +9,8 @@ from models import (
     GameConfig,
     GameConfigUpdate,
     GamePhase,
+    ReleaseStationsBody,
+    SetBalanceBody,
     TeamAdminView,
     TeamCreate,
     TeamUpdate,
@@ -216,5 +218,132 @@ async def overview(_: AdminIdentity = Depends(require_superadmin)):
 @router.get("/log", response_model=list[ActionLogEntry])
 async def global_log(_: AdminIdentity = Depends(require_superadmin), limit: int = 500):
     pool = get_pool()
-    rows = await pool.fetch("SELECT * FROM action_log ORDER BY created_at DESC LIMIT $1", limit)
+    rows = await pool.fetch(
+        """SELECT al.*, t.name AS team_name FROM action_log al JOIN teams t ON t.id = al.team_id
+           ORDER BY al.created_at DESC LIMIT $1""",
+        limit,
+    )
     return [ActionLogEntry(**dict(r)) for r in rows]
+
+
+async def _team_admin_view_by_id(pool, team_id: int) -> TeamAdminView:
+    row = await pool.fetchrow(
+        """
+        SELECT t.*, a.admin_share_token, COALESCE(sc.cnt, 0) AS stations_owned
+        FROM teams t
+        JOIN admins a ON a.team_id = t.id
+        LEFT JOIN (
+            SELECT owner_team_id, COUNT(*) AS cnt FROM station_claims
+            WHERE owner_team_id IS NOT NULL GROUP BY owner_team_id
+        ) sc ON sc.owner_team_id = t.id
+        WHERE t.id = $1
+        """,
+        team_id,
+    )
+    if row is None:
+        raise HTTPException(status_code=404, detail="找不到此隊伍")
+    return TeamAdminView(
+        id=row["id"], name=row["name"], color_hex=row["color_hex"],
+        meeting_station_id=row["meeting_station_id"], chips_balance=row["chips_balance"],
+        active=row["active"], stations_owned=row["stations_owned"], rank=0,
+        share_token=row["share_token"], admin_share_token=row["admin_share_token"],
+    )
+
+
+@router.post("/teams/{team_id}/set-balance", response_model=TeamAdminView)
+async def set_team_balance(team_id: int, body: SetBalanceBody, _: AdminIdentity = Depends(require_superadmin)):
+    pool = get_pool()
+    async with pool.acquire() as conn:
+        async with conn.transaction():
+            team = await conn.fetchrow(
+                "UPDATE teams SET chips_balance = $1 WHERE id = $2 RETURNING *", body.balance, team_id
+            )
+            if team is None:
+                raise HTTPException(status_code=404, detail="找不到此隊伍")
+            adjust_msg = f"總管理員直接設定代幣餘額為 {body.balance} 枚"
+            await conn.execute(
+                """INSERT INTO action_log (team_id, actor, action_type, resulting_balance, message)
+                   VALUES ($1, '總管理員', 'admin_adjust', $2, $3)""",
+                team_id, body.balance, adjust_msg,
+            )
+    await manager.notify_team(team_id, "team_update")
+    await manager.broadcast_global("ranking_update")
+    await manager.broadcast_global(
+        "activity_log", team_id=team_id, team_name=team["name"], action_type="admin_adjust",
+        message=adjust_msg, chip_delta=None,
+    )
+    return await _team_admin_view_by_id(pool, team_id)
+
+
+@router.post("/teams/{team_id}/release-stations", response_model=TeamAdminView)
+async def release_stations(team_id: int, body: ReleaseStationsBody, _: AdminIdentity = Depends(require_superadmin)):
+    pool = get_pool()
+    released: list = []
+    async with pool.acquire() as conn:
+        async with conn.transaction():
+            team = await conn.fetchrow("SELECT * FROM teams WHERE id = $1", team_id)
+            if team is None:
+                raise HTTPException(status_code=404, detail="找不到此隊伍")
+            cfg = await conn.fetchrow("SELECT max_deposit_per_visit FROM game_config WHERE id = 1")
+            if body.station_ids is None:
+                released = await conn.fetch(
+                    """UPDATE station_claims SET owner_team_id = NULL, value = 0, cap = $2, updated_at = now()
+                       WHERE owner_team_id = $1 RETURNING station_id""",
+                    team_id, cfg["max_deposit_per_visit"],
+                )
+            else:
+                released = await conn.fetch(
+                    """UPDATE station_claims SET owner_team_id = NULL, value = 0, cap = $3, updated_at = now()
+                       WHERE owner_team_id = $1 AND station_id = ANY($2::int[]) RETURNING station_id""",
+                    team_id, body.station_ids, cfg["max_deposit_per_visit"],
+                )
+            if released:
+                release_msg = f"總管理員釋出 {len(released)} 個車站"
+                await conn.execute(
+                    """INSERT INTO action_log (team_id, actor, action_type, message)
+                       VALUES ($1, '總管理員', 'admin_adjust', $2)""",
+                    team_id, release_msg,
+                )
+    if released:
+        await manager.notify_team(team_id, "team_update")
+        await manager.broadcast_global("map_update")
+        await manager.broadcast_global("ranking_update")
+        await manager.broadcast_global(
+            "activity_log", team_id=team_id, team_name=team["name"], action_type="admin_adjust",
+            message=f"總管理員釋出 {len(released)} 個車站", chip_delta=None,
+        )
+    return await _team_admin_view_by_id(pool, team_id)
+
+
+@router.post("/teams/{team_id}/reset", response_model=TeamAdminView)
+async def reset_team(team_id: int, _: AdminIdentity = Depends(require_superadmin)):
+    pool = get_pool()
+    async with pool.acquire() as conn:
+        async with conn.transaction():
+            cfg = await conn.fetchrow("SELECT starting_chips, max_deposit_per_visit FROM game_config WHERE id = 1")
+            team = await conn.fetchrow(
+                "UPDATE teams SET chips_balance = $1 WHERE id = $2 RETURNING *", cfg["starting_chips"], team_id
+            )
+            if team is None:
+                raise HTTPException(status_code=404, detail="找不到此隊伍")
+            await conn.execute(
+                "UPDATE station_claims SET owner_team_id = NULL, value = 0, cap = $2, updated_at = now() WHERE owner_team_id = $1",
+                team_id, cfg["max_deposit_per_visit"],
+            )
+            await conn.execute("DELETE FROM approval_requests WHERE team_id = $1", team_id)
+            await conn.execute("DELETE FROM challenge_attempts WHERE team_id = $1", team_id)
+            await conn.execute("DELETE FROM action_log WHERE team_id = $1", team_id)
+            await conn.execute(
+                """INSERT INTO action_log (team_id, actor, action_type, resulting_balance, message)
+                   VALUES ($1, '總管理員', 'admin_adjust', $2, '總管理員重置此隊伍的所有進度')""",
+                team_id, cfg["starting_chips"],
+            )
+    await manager.notify_team(team_id, "team_update")
+    await manager.notify_admin(team_id, "admin_pending")
+    await manager.broadcast_global("map_update")
+    await manager.broadcast_global("ranking_update")
+    await manager.broadcast_global(
+        "activity_log", team_id=team_id, team_name=team["name"], action_type="admin_adjust",
+        message="總管理員重置此隊伍的所有進度", chip_delta=None,
+    )
+    return await _team_admin_view_by_id(pool, team_id)

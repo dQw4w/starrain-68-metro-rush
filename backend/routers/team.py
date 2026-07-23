@@ -72,17 +72,21 @@ async def team_state(token: str):
 
 @router.get("/log", response_model=list[ActionLogEntry])
 async def team_log(token: str, action_type: str | None = Query(default=None), limit: int = Query(default=200, le=500)):
-    team = await _team_by_token(token)
+    # Just validates the token exists — the log itself is global (every team's
+    # actions, not only this team's), per the game's "shared operations log" rule.
+    await _team_by_token(token)
     pool = get_pool()
     if action_type:
         rows = await pool.fetch(
-            "SELECT * FROM action_log WHERE team_id = $1 AND action_type = $2 ORDER BY created_at DESC LIMIT $3",
-            team["id"], action_type, limit,
+            """SELECT al.*, t.name AS team_name FROM action_log al JOIN teams t ON t.id = al.team_id
+               WHERE al.action_type = $1 ORDER BY al.created_at DESC LIMIT $2""",
+            action_type, limit,
         )
     else:
         rows = await pool.fetch(
-            "SELECT * FROM action_log WHERE team_id = $1 ORDER BY created_at DESC LIMIT $2",
-            team["id"], limit,
+            """SELECT al.*, t.name AS team_name FROM action_log al JOIN teams t ON t.id = al.team_id
+               ORDER BY al.created_at DESC LIMIT $1""",
+            limit,
         )
     return [ActionLogEntry(**dict(r)) for r in rows]
 

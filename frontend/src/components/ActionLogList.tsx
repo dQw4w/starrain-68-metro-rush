@@ -38,7 +38,9 @@ export default function ActionLogList({ entries }: { entries: ActionLogEntry[] }
         {filtered.map((e) => (
           <div key={e.id} className="bg-white/5 rounded-lg px-3 py-2 text-sm">
             <div className="flex justify-between items-baseline gap-2">
-              <span className="font-medium text-white">{TYPE_LABELS[e.action_type] || e.action_type}</span>
+              <span className="font-medium text-white">
+                <span className="text-white/50">{e.team_name}</span> · {TYPE_LABELS[e.action_type] || e.action_type}
+              </span>
               <span className="text-white/40 text-xs shrink-0">
                 {new Date(e.created_at).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' })}
               </span>

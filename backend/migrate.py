@@ -5,6 +5,7 @@ from db import get_pool
 from auth import hash_pin
 from config import SUPERADMIN_BOOTSTRAP_PIN
 from seed_stations import seed
+from seed_challenges import seed as seed_challenges
 
 _SCHEMA_PATH = Path(__file__).parent / "schema.sql"
 
@@ -20,6 +21,7 @@ async def run_migrations() -> None:
     async with pool.acquire() as conn:
         async with conn.transaction():
             await seed(conn)
+            await seed_challenges(conn)
 
 
 async def _backfill_admin_links() -> None:

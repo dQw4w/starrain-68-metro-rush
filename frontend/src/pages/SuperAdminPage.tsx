@@ -6,10 +6,11 @@ import GameClock from '../components/GameClock'
 import LineWaypointEditor from '../components/LineWaypointEditor'
 import RankingBoard from '../components/RankingBoard'
 import StationCoordEditor from '../components/StationCoordEditor'
+import ToastStack, { useToastQueue } from '../components/ToastStack'
 import { usePhase } from '../hooks/usePhase'
 import { useWebSocket, type WsEvent } from '../hooks/useWebSocket'
 import { clearAdminSession, loadAdminSession } from '../lib/adminSession'
-import type { ActionLogEntry, Challenge, GameConfig, MapData, Station, TeamAdminView } from '../types'
+import type { ActionLogEntry, Challenge, GameConfig, MapData, Station, StationClaim, TeamAdminView } from '../types'
 
 type Tab = 'overview' | 'teams' | 'config' | 'challenges' | 'waypoints' | 'log'
 
@@ -26,6 +27,7 @@ export default function SuperAdminPage() {
   const [mapData, setMapData] = useState<MapData | null>(null)
   const [error, setError] = useState('')
   const { phase, refetchPhase } = usePhase()
+  const { toasts, push: pushToast } = useToastQueue()
 
   useEffect(() => {
     if (!session || !session.is_super) navigate('/admin/login')
@@ -38,11 +40,14 @@ export default function SuperAdminPage() {
     setConfig(c)
     setChallenges(ch)
     api.globalLog(token).then(setLog).catch(() => {})
+    // Station ownership (mapData.claims) backs the teams tab's progress panel
+    // too, not just the map/waypoint editors — keep it in lockstep with every
+    // other refresh (team edits, WS map_update, ...) rather than fetching once.
+    api.getMap().then(setMapData).catch(() => {})
   }, [token])
 
   useEffect(() => {
     refresh()
-    api.getMap().then(setMapData).catch(() => {})
   }, [refresh])
 
   const getTicket = useCallback(async () => {
@@ -55,8 +60,11 @@ export default function SuperAdminPage() {
         refresh()
       }
       if (ev.type === 'config_update') refetchPhase()
+      if (ev.type === 'activity_log') {
+        pushToast({ team_name: ev.team_name, message: ev.message, chip_delta: ev.chip_delta })
+      }
     },
-    [refresh, refetchPhase]
+    [refresh, refetchPhase, pushToast]
   )
   useWebSocket(getTicket, handleWsEvent)
 
@@ -69,6 +77,7 @@ export default function SuperAdminPage() {
 
   return (
     <div className="min-h-screen bg-slate-900 text-white flex flex-col">
+      <ToastStack toasts={toasts} />
       <header className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-3 bg-slate-800">
         <h1 className="font-black text-lg flex-1">Metro Rush｜總管理員</h1>
         <button onClick={logout} className="text-white/50 text-sm">
@@ -106,6 +115,7 @@ export default function SuperAdminPage() {
             onError={(m) => setError(m)}
             configLocked={config?.locked ?? false}
             stations={mapData?.stations ?? []}
+            claims={mapData?.claims ?? []}
           />
         )}
 
@@ -144,6 +154,7 @@ function TeamsTab({
   onError,
   configLocked,
   stations,
+  claims,
 }: {
   teams: TeamAdminView[]
   token: string
@@ -151,12 +162,14 @@ function TeamsTab({
   onError: (m: string) => void
   configLocked: boolean
   stations: Station[]
+  claims: StationClaim[]
 }) {
   const [name, setName] = useState('')
   const [color, setColor] = useState('#3B82F6')
   const [meetingStationId, setMeetingStationId] = useState<number | ''>('')
   const [busy, setBusy] = useState(false)
   const [editingId, setEditingId] = useState<number | null>(null)
+  const [progressOpenId, setProgressOpenId] = useState<number | null>(null)
 
   async function createTeam(e: React.FormEvent) {
     e.preventDefault()
@@ -215,14 +228,20 @@ function TeamsTab({
               onError={onError}
             />
           ) : (
-            <TeamRow
-              key={t.id}
-              team={t}
-              onEdit={() => setEditingId(t.id)}
-              onDelete={() => deleteTeam(t)}
-              onRegenerateLink={() => regenerateLink(t)}
-              canDelete={!configLocked}
-            />
+            <div key={t.id} className="flex flex-col gap-2">
+              <TeamRow
+                team={t}
+                onEdit={() => setEditingId(t.id)}
+                onDelete={() => deleteTeam(t)}
+                onRegenerateLink={() => regenerateLink(t)}
+                onToggleProgress={() => setProgressOpenId(progressOpenId === t.id ? null : t.id)}
+                progressOpen={progressOpenId === t.id}
+                canDelete={!configLocked}
+              />
+              {progressOpenId === t.id && (
+                <TeamProgressPanel team={t} stations={stations} claims={claims} token={token} onChanged={onChanged} onError={onError} />
+              )}
+            </div>
           )
         )}
       </div>
@@ -275,12 +294,16 @@ function TeamRow({
   onEdit,
   onDelete,
   onRegenerateLink,
+  onToggleProgress,
+  progressOpen,
   canDelete,
 }: {
   team: TeamAdminView
   onEdit: () => void
   onDelete: () => void
   onRegenerateLink: () => void
+  onToggleProgress: () => void
+  progressOpen: boolean
   canDelete: boolean
 }) {
   const playerUrl = `${window.location.origin}/team/${team.share_token}`
@@ -300,6 +323,12 @@ function TeamRow({
         </div>
         <button onClick={onEdit} className="bg-white/10 rounded-lg px-3 py-1.5 text-sm font-bold">
           編輯
+        </button>
+        <button
+          onClick={onToggleProgress}
+          className={`rounded-lg px-3 py-1.5 text-sm font-bold ${progressOpen ? 'bg-amber-500 text-black' : 'bg-white/10'}`}
+        >
+          進度調整
         </button>
         <Link to={`/admin/team/${team.admin_share_token}`} className="bg-blue-600 rounded-lg px-3 py-1.5 text-sm font-bold">
           進入審核
@@ -346,6 +375,109 @@ function TeamRow({
           刪除隊伍
         </button>
       )}
+    </div>
+  )
+}
+
+function TeamProgressPanel({
+  team,
+  stations,
+  claims,
+  token,
+  onChanged,
+  onError,
+}: {
+  team: TeamAdminView
+  stations: Station[]
+  claims: StationClaim[]
+  token: string
+  onChanged: () => void
+  onError: (m: string) => void
+}) {
+  const [balance, setBalance] = useState(String(team.chips_balance))
+  const [busy, setBusy] = useState(false)
+  const owned = claims.filter((c) => c.owner_team_id === team.id)
+  const stationName = (id: number) => stations.find((s) => s.id === id)?.name_zh || `車站 #${id}`
+
+  async function run(fn: () => Promise<unknown>, confirmMsg?: string) {
+    if (confirmMsg && !window.confirm(confirmMsg)) return
+    setBusy(true)
+    try {
+      await fn()
+      onChanged()
+    } catch (e: any) {
+      onError(e.message || '操作失敗')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="bg-black/20 rounded-xl p-3 flex flex-col gap-3 ring-1 ring-amber-400/30">
+      <p className="font-bold text-sm text-amber-300">進度調整（總管理員）</p>
+
+      <div className="flex items-center gap-2">
+        <label className="text-xs text-white/50 shrink-0">代幣餘額</label>
+        <input
+          type="number"
+          value={balance}
+          disabled={busy}
+          onChange={(e) => setBalance(e.target.value)}
+          className="w-24 bg-white/10 rounded-lg px-2 py-1.5 text-sm disabled:opacity-50"
+        />
+        <button
+          disabled={busy}
+          onClick={() => run(() => api.setTeamBalance(token, team.id, Number(balance)))}
+          className="bg-blue-600 disabled:opacity-40 rounded-lg px-3 py-1.5 text-xs font-bold"
+        >
+          設定
+        </button>
+      </div>
+
+      <div>
+        <p className="text-xs text-white/40 mb-1">目前佔領車站（{owned.length}）</p>
+        {owned.length === 0 && <p className="text-xs text-white/30">無</p>}
+        {owned.length > 0 && (
+          <div className="flex flex-col gap-1 max-h-40 overflow-y-auto">
+            {owned.map((c) => (
+              <div key={c.station_id} className="flex items-center justify-between bg-white/5 rounded px-2 py-1 text-xs">
+                <span>
+                  {stationName(c.station_id)}（{c.value}/{c.cap}）
+                </span>
+                <button
+                  disabled={busy}
+                  onClick={() => run(() => api.releaseStations(token, team.id, [c.station_id]))}
+                  className="text-rose-400 disabled:opacity-40 shrink-0"
+                >
+                  釋出
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+        {owned.length > 0 && (
+          <button
+            disabled={busy}
+            onClick={() => run(() => api.releaseStations(token, team.id, null), `確定要釋出「${team.name}」所有車站嗎？`)}
+            className="mt-2 bg-white/10 disabled:opacity-40 rounded-lg px-3 py-1.5 text-xs font-bold"
+          >
+            釋出全部車站
+          </button>
+        )}
+      </div>
+
+      <button
+        disabled={busy}
+        onClick={() =>
+          run(
+            () => api.resetTeam(token, team.id),
+            `確定要重置「${team.name}」的所有進度嗎？（代幣、車站、任務紀錄、日誌全部清空重來，此動作無法復原）`
+          )
+        }
+        className="bg-rose-600 disabled:opacity-40 rounded-lg py-2 font-bold text-sm"
+      >
+        重置此隊伍所有進度
+      </button>
     </div>
   )
 }

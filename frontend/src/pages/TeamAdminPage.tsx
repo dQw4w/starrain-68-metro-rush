@@ -4,6 +4,7 @@ import { api } from '../api'
 import ActionLogList from '../components/ActionLogList'
 import GameClock from '../components/GameClock'
 import MetroMap from '../components/MetroMap'
+import ToastStack, { useToastQueue } from '../components/ToastStack'
 import { usePhase } from '../hooks/usePhase'
 import { useWebSocket, type WsEvent } from '../hooks/useWebSocket'
 import type { ActionLogEntry, ApprovalRequest, ChallengeTeaser, DevicePosition, MapData, TeamPublic } from '../types'
@@ -36,7 +37,9 @@ export default function TeamAdminPage() {
   const [challenges, setChallenges] = useState<ChallengeTeaser[]>([])
   const [tab, setTab] = useState<'queue' | 'log' | 'gps' | 'adjust'>('queue')
   const [error, setError] = useState('')
+  const [busyId, setBusyId] = useState<number | null>(null)
   const { phase, refetchPhase } = usePhase()
+  const { toasts, push: pushToast } = useToastQueue()
 
   useEffect(() => {
     if (!token) return
@@ -80,8 +83,11 @@ export default function TeamAdminPage() {
       if (ev.type === 'map_update') api.getMap().then(setMapData)
       if (ev.type === 'challenge_pool') api.getActiveChallenges().then(setChallenges)
       if (ev.type === 'config_update') refetchPhase()
+      if (ev.type === 'activity_log') {
+        pushToast({ team_name: ev.team_name, message: ev.message, chip_delta: ev.chip_delta })
+      }
     },
-    [refresh, teamId, refetchPhase]
+    [refresh, teamId, refetchPhase, pushToast]
   )
   useWebSocket(getTicket, handleWsEvent)
 
@@ -98,21 +104,27 @@ export default function TeamAdminPage() {
 
   async function handleApprove(req: ApprovalRequest, body?: { success: boolean; achieved_value?: number }) {
     if (!teamId) return
+    setBusyId(req.id)
     try {
       await api.adminApprove(token, teamId, req.id, body)
-      refresh()
+      await refresh()
     } catch (e: any) {
       setError(e.message || '操作失敗')
+    } finally {
+      setBusyId(null)
     }
   }
 
   async function handleDeny(req: ApprovalRequest) {
     if (!teamId) return
+    setBusyId(req.id)
     try {
       await api.adminDeny(token, teamId, req.id)
-      refresh()
+      await refresh()
     } catch (e: any) {
       setError(e.message || '操作失敗')
+    } finally {
+      setBusyId(null)
     }
   }
 
@@ -135,6 +147,7 @@ export default function TeamAdminPage() {
 
   return (
     <div className="min-h-screen bg-slate-900 text-white flex flex-col">
+      <ToastStack toasts={toasts} />
       <header className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-3 bg-slate-800">
         <span className="w-3.5 h-3.5 rounded-full" style={{ backgroundColor: teamInfo.color_hex }} />
         <h1 className="font-black text-lg flex-1">{teamInfo.name}｜隨隊管理員</h1>
@@ -176,6 +189,7 @@ export default function TeamAdminPage() {
                 key={req.id}
                 req={req}
                 highlighted={req.id === oldest?.id}
+                busy={busyId === req.id}
                 stationName={stationName}
                 challengeName={challengeName}
                 onApprove={(body) => handleApprove(req, body)}
@@ -203,9 +217,14 @@ export default function TeamAdminPage() {
   )
 }
 
+function Spinner() {
+  return <span className="inline-block w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+}
+
 function PendingCard({
   req,
   highlighted,
+  busy,
   stationName,
   challengeName,
   onApprove,
@@ -213,6 +232,7 @@ function PendingCard({
 }: {
   req: ApprovalRequest
   highlighted: boolean
+  busy: boolean
   stationName: (id: number) => string
   challengeName: (id: number) => string
   onApprove: (body?: { success: boolean; achieved_value?: number }) => void
@@ -250,31 +270,42 @@ function PendingCard({
             type="number"
             placeholder="實際完成數量（可覆蓋隊伍回報值）"
             value={achieved}
+            disabled={busy}
             onChange={(e) => setAchieved(e.target.value)}
-            className="bg-white/10 rounded-lg px-2 py-1.5 text-sm"
+            className="bg-white/10 rounded-lg px-2 py-1.5 text-sm disabled:opacity-50"
           />
           <div className="flex gap-2">
             <button
+              disabled={busy}
               onClick={() => onApprove({ success: true, achieved_value: achieved ? Number(achieved) : undefined })}
-              className="flex-1 bg-emerald-600 rounded-lg py-2 font-bold text-sm"
+              className="flex-1 bg-emerald-600 disabled:opacity-50 rounded-lg py-2 font-bold text-sm flex items-center justify-center gap-1.5"
             >
-              判定成功
+              {busy ? <Spinner /> : '判定成功'}
             </button>
             <button
+              disabled={busy}
               onClick={() => onApprove({ success: false, achieved_value: achieved ? Number(achieved) : undefined })}
-              className="flex-1 bg-rose-600 rounded-lg py-2 font-bold text-sm"
+              className="flex-1 bg-rose-600 disabled:opacity-50 rounded-lg py-2 font-bold text-sm flex items-center justify-center gap-1.5"
             >
-              判定失敗
+              {busy ? <Spinner /> : '判定失敗'}
             </button>
           </div>
         </div>
       ) : (
         <div className="mt-2 flex gap-2">
-          <button onClick={() => onApprove()} className="flex-1 bg-emerald-600 rounded-lg py-2 font-bold text-sm">
-            核准
+          <button
+            disabled={busy}
+            onClick={() => onApprove()}
+            className="flex-1 bg-emerald-600 disabled:opacity-50 rounded-lg py-2 font-bold text-sm flex items-center justify-center gap-1.5"
+          >
+            {busy ? <Spinner /> : '核准'}
           </button>
-          <button onClick={onDeny} className="flex-1 bg-rose-600 rounded-lg py-2 font-bold text-sm">
-            拒絕
+          <button
+            disabled={busy}
+            onClick={onDeny}
+            className="flex-1 bg-rose-600 disabled:opacity-50 rounded-lg py-2 font-bold text-sm flex items-center justify-center gap-1.5"
+          >
+            {busy ? <Spinner /> : '拒絕'}
           </button>
         </div>
       )}

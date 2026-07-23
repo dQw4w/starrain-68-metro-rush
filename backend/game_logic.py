@@ -80,19 +80,40 @@ async def _log(conn, team_id, actor, action_type, *, station_id=None, challenge_
 
 
 _EVENT_DISPATCH = {
-    "notify_team": lambda team_id, event: manager.notify_team(team_id, event),
-    "notify_admin": lambda team_id, event: manager.notify_admin(team_id, event),
+    "notify_team": manager.notify_team,
+    "notify_admin": manager.notify_admin,
 }
 
 
 async def _fire(events: list[tuple]) -> None:
+    """Each event tuple is (kind, ...args, [extra_dict]). `extra_dict`, if
+    present as the last element, is forwarded as **kwargs to the underlying
+    ConnectionManager call — this is what lets a single event carry a toast
+    payload (team_name/message/chip_delta) alongside its type."""
     for ev in events:
         kind = ev[0]
         if kind == "broadcast_global":
-            await manager.broadcast_global(ev[1])
+            event_type = ev[1]
+            extra = ev[2] if len(ev) > 2 else {}
+            await manager.broadcast_global(event_type, **extra)
         else:
-            team_id, event = ev[1], ev[2]
-            await _EVENT_DISPATCH[kind](team_id, event)
+            team_id, event_type = ev[1], ev[2]
+            extra = ev[3] if len(ev) > 3 else {}
+            await _EVENT_DISPATCH[kind](team_id, event_type, **extra)
+
+
+def _activity_event(team_id: int, team_name: str, action_type: str, message: str,
+                     chip_delta: int | None = None) -> tuple:
+    """A broadcast_global('activity_log', ...) event — every team/admin screen
+    listens for this to show a live toast for what any team just did."""
+    return ("broadcast_global", "activity_log", {
+        "team_id": team_id, "team_name": team_name, "action_type": action_type,
+        "message": message, "chip_delta": chip_delta,
+    })
+
+
+async def _team_name(conn, team_id: int) -> str:
+    return await conn.fetchval("SELECT name FROM teams WHERE id = $1", team_id) or f"隊伍 #{team_id}"
 
 
 # ---------------------------------------------------------------------------
@@ -163,18 +184,23 @@ async def create_action_request(team_id: int, station_id: int, kind: str,
                     await conn.execute("UPDATE teams SET chips_balance = chips_balance - $1 WHERE id = $2", cost, team_id)
                     await conn.execute("UPDATE teams SET chips_balance = chips_balance + $1 WHERE id = $2", cost, owner_id)
                     payer_balance = team["chips_balance"] - cost
-                    owner_row = await conn.fetchrow("SELECT chips_balance FROM teams WHERE id = $1", owner_id)
+                    owner_row = await conn.fetchrow("SELECT chips_balance, name FROM teams WHERE id = $1", owner_id)
+                    payer_name = await _team_name(conn, team_id)
+                    toll_paid_msg = f"通行費：經過對方車站，支付 {cost} 枚代幣"
+                    toll_received_msg = f"收到通行費 {cost} 枚代幣"
                     await _log(conn, team_id, "team", "toll_paid", station_id=station_id,
                                chip_delta=-cost, resulting_balance=payer_balance,
-                               message=f"通行費：經過對方車站，支付 {cost} 枚代幣")
+                               message=toll_paid_msg)
                     await _log(conn, owner_id, "team", "toll_received", station_id=station_id,
                                chip_delta=cost, resulting_balance=owner_row["chips_balance"],
-                               message=f"收到通行費 {cost} 枚代幣")
+                               message=toll_received_msg)
                     result = {"status": "toll", "cost": cost}
                     events = [
                         ("notify_team", team_id, "team_update"),
                         ("notify_team", owner_id, "team_update"),
                         ("broadcast_global", "ranking_update"),
+                        _activity_event(team_id, payer_name, "toll_paid", toll_paid_msg, -cost),
+                        _activity_event(owner_id, owner_row["name"], "toll_received", toll_received_msg, cost),
                     ]
                 else:
                     min_amount, max_amount = _deposit_bounds(kind, claim["value"], claim["cap"], cfg["max_deposit_per_visit"])
@@ -266,13 +292,14 @@ async def resolve_action_request(request_id: int, admin_id: int, approve: bool) 
                             new_value, req["station_id"],
                         )
 
-                    team = await conn.fetchrow("SELECT chips_balance FROM teams WHERE id = $1 FOR UPDATE", new_owner)
+                    team = await conn.fetchrow("SELECT chips_balance, name FROM teams WHERE id = $1 FOR UPDATE", new_owner)
                     await conn.execute("UPDATE teams SET chips_balance = chips_balance - $1 WHERE id = $2", deposit, new_owner)
                     new_balance = team["chips_balance"] - deposit
                     action_label = "佔領" if req["kind"] == "claim" else "加碼"
+                    log_msg = f"{action_label}車站，投入 {deposit} 枚代幣（車站代幣數：{new_value}）"
                     await _log(conn, new_owner, "team", req["kind"], station_id=req["station_id"],
                                chip_delta=-deposit, resulting_balance=new_balance,
-                               message=f"{action_label}車站，投入 {deposit} 枚代幣（車站代幣數：{new_value}）")
+                               message=log_msg)
                     await conn.execute(
                         "UPDATE approval_requests SET status = 'approved', resolved_by = $1, resolved_at = now() WHERE id = $2",
                         admin_id, request_id,
@@ -283,6 +310,7 @@ async def resolve_action_request(request_id: int, admin_id: int, approve: bool) 
                         ("notify_admin", new_owner, "admin_pending"),
                         ("broadcast_global", "map_update"),
                         ("broadcast_global", "ranking_update"),
+                        _activity_event(new_owner, team["name"], req["kind"], log_msg, -deposit),
                     ]
                     if prev_owner and prev_owner != new_owner:
                         events.append(("notify_team", prev_owner, "team_update"))
@@ -399,10 +427,16 @@ async def resolve_challenge_start(request_id: int, admin_id: int, approve: bool)
                            WHERE id = $3""",
                         admin_id, attempt["id"], request_id,
                     )
+                    start_msg = f"任務「{challenge['name']}」開始"
                     await _log(conn, req["team_id"], "admin", "challenge_start_approved",
-                               challenge_id=req["challenge_id"], message=f"任務「{challenge['name']}」開始")
+                               challenge_id=req["challenge_id"], message=start_msg)
                     result = {"status": "approved", "attempt_id": attempt["id"]}
-                    events = [("notify_team", req["team_id"], "team_update"), ("notify_admin", req["team_id"], "admin_pending")]
+                    team_name = await _team_name(conn, req["team_id"])
+                    events = [
+                        ("notify_team", req["team_id"], "team_update"),
+                        ("notify_admin", req["team_id"], "admin_pending"),
+                        _activity_event(req["team_id"], team_name, "challenge_start_approved", start_msg),
+                    ]
 
     await _fire(events)
     return result
@@ -542,18 +576,26 @@ async def resolve_challenge_result(request_id: int, admin_id: int, success: bool
 
             new_team_balance_row = await conn.fetchrow("SELECT chips_balance FROM teams WHERE id = $1", attempt["team_id"])
             outcome_label = "成功" if success else "失敗"
+            result_msg = f"任務「{challenge['name']}」{outcome_label}，獲得 {reward_amount} 枚代幣"
             await _log(conn, attempt["team_id"], "admin", "challenge_result", challenge_id=challenge["id"],
                        chip_delta=reward_amount or None, resulting_balance=new_team_balance_row["chips_balance"],
-                       message=f"任務「{challenge['name']}」{outcome_label}，獲得 {reward_amount} 枚代幣")
+                       message=result_msg)
 
-            events = [("notify_team", attempt["team_id"], "team_update"), ("notify_admin", attempt["team_id"], "admin_pending")]
+            acting_team_name = team["name"]
+            events = [
+                ("notify_team", attempt["team_id"], "team_update"),
+                ("notify_admin", attempt["team_id"], "admin_pending"),
+                _activity_event(attempt["team_id"], acting_team_name, "challenge_result", result_msg, reward_amount or None),
+            ]
 
             if steal_amount and target_row is not None:
                 target_new_balance = await conn.fetchrow("SELECT chips_balance FROM teams WHERE id = $1", target_row["id"])
+                stolen_msg = f"被「{challenge['name']}」偷走 {steal_amount} 枚代幣"
                 await _log(conn, target_row["id"], "admin", "challenge_stolen", challenge_id=challenge["id"],
                            chip_delta=-steal_amount, resulting_balance=target_new_balance["chips_balance"],
-                           message=f"被「{challenge['name']}」偷走 {steal_amount} 枚代幣")
+                           message=stolen_msg)
                 events.append(("notify_team", target_row["id"], "team_update"))
+                events.append(_activity_event(target_row["id"], target_row["name"], "challenge_stolen", stolen_msg, -steal_amount))
 
             if reward_amount:
                 events.append(("broadcast_global", "ranking_update"))
@@ -614,6 +656,7 @@ async def sweep_expired_attempts() -> None:
         return
     pool = get_pool()
     touched = False
+    auto_fail_events: list[tuple] = []
     async with pool.acquire() as conn:
         async with conn.transaction():
             stuck = await conn.fetch(
@@ -629,8 +672,10 @@ async def sweep_expired_attempts() -> None:
                     "UPDATE approval_requests SET status = 'stale' WHERE challenge_attempt_id = $1 AND status = 'pending'",
                     a["id"],
                 )
+                fail_msg = "遊戲時間結束，任務自動判定為失敗"
                 await _log(conn, a["team_id"], "system", "challenge_auto_failed", challenge_id=a["challenge_id"],
-                            message="遊戲時間結束，任務自動判定為失敗")
+                            message=fail_msg)
+                auto_fail_events.append((a["team_id"], await _team_name(conn, a["team_id"]), fail_msg))
             pending_actions = await conn.fetch(
                 "SELECT * FROM approval_requests WHERE status = 'pending' AND kind IN ('claim', 'topup') FOR UPDATE"
             )
@@ -639,6 +684,11 @@ async def sweep_expired_attempts() -> None:
                 await conn.execute("UPDATE approval_requests SET status = 'stale' WHERE id = $1", r["id"])
     if touched:
         await manager.broadcast_global("ranking_update")
+        for team_id, team_name, msg in auto_fail_events:
+            await manager.broadcast_global(
+                "activity_log", team_id=team_id, team_name=team_name,
+                action_type="challenge_auto_failed", message=msg, chip_delta=None,
+            )
 
 
 # ---------------------------------------------------------------------------

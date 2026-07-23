@@ -122,6 +122,20 @@ export const api = {
     }),
   deleteTeam: (token: string, teamId: number) =>
     req<{ ok: boolean }>(`/superadmin/teams/${teamId}`, { method: 'DELETE', headers: authHeaders(token) }),
+  setTeamBalance: (token: string, teamId: number, balance: number) =>
+    req<TeamAdminView>(`/superadmin/teams/${teamId}/set-balance`, {
+      method: 'POST',
+      headers: authHeaders(token),
+      body: JSON.stringify({ balance }),
+    }),
+  releaseStations: (token: string, teamId: number, stationIds: number[] | null) =>
+    req<TeamAdminView>(`/superadmin/teams/${teamId}/release-stations`, {
+      method: 'POST',
+      headers: authHeaders(token),
+      body: JSON.stringify({ station_ids: stationIds }),
+    }),
+  resetTeam: (token: string, teamId: number) =>
+    req<TeamAdminView>(`/superadmin/teams/${teamId}/reset`, { method: 'POST', headers: authHeaders(token) }),
   overview: (token: string) => req<{ ranking: (TeamPublicWithPending)[] }>('/superadmin/overview', { headers: authHeaders(token) }),
   globalLog: (token: string) => req<ActionLogEntry[]>('/superadmin/log', { headers: authHeaders(token) }),
 

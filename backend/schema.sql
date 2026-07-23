@@ -133,6 +133,10 @@ CREATE TABLE IF NOT EXISTS challenges (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- Lets seed_challenges.py upsert by name instead of inserting a fresh
+-- duplicate row every time the seed data changes.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_challenges_name ON challenges (name);
+
 CREATE TABLE IF NOT EXISTS challenge_attempts (
     id SERIAL PRIMARY KEY,
     challenge_id INT NOT NULL REFERENCES challenges(id) ON DELETE CASCADE,

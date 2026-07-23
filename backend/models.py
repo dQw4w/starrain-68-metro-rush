@@ -231,6 +231,14 @@ class AdjustChipsBody(BaseModel):
     reason: str
 
 
+class SetBalanceBody(BaseModel):
+    balance: int
+
+
+class ReleaseStationsBody(BaseModel):
+    station_ids: Optional[list[int]] = None  # None/omitted = release every station this team owns
+
+
 # ---------------------------------------------------------------------------
 # Challenges
 # ---------------------------------------------------------------------------
@@ -325,6 +333,7 @@ class ChallengeSubmitResultRequest(BaseModel):
 class ActionLogEntry(BaseModel):
     id: int
     team_id: int
+    team_name: str
     actor: str
     action_type: str
     station_id: Optional[int]
