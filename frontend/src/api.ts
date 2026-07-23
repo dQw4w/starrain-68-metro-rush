@@ -45,11 +45,11 @@ export const api = {
   // --- Public map ---
   getMap: () => req<MapData>('/map'),
   getActiveChallenges: () => req<ChallengeTeaser[]>('/map/challenges'),
-  listTeamsPublic: () => req<{ id: number; name: string; color_hex: string }[]>('/teams/public'),
 
   // --- Auth ---
-  login: (body: { role: 'super' | 'team'; team_id?: number; pin: string }) =>
-    req<LoginResponse>('/auth/login', { method: 'POST', body: JSON.stringify(body) }),
+  login: (pin: string) => req<LoginResponse>('/auth/login', { method: 'POST', body: JSON.stringify({ pin }) }),
+  loginByLink: (adminToken: string) =>
+    req<LoginResponse>(`/auth/login-link/${adminToken}`, { method: 'POST' }),
   logout: (token: string) =>
     req<{ ok: boolean }>('/auth/logout', { method: 'POST', headers: authHeaders(token) }),
   adminWsTicket: (token: string) =>
@@ -108,13 +108,18 @@ export const api = {
   listTeams: (token: string) => req<TeamAdminView[]>('/superadmin/teams', { headers: authHeaders(token) }),
   createTeam: (
     token: string,
-    body: { name: string; color_hex: string; meeting_station_id?: number; admin_pin: string }
+    body: { name: string; color_hex: string; meeting_station_id?: number }
   ) => req<TeamAdminView>('/superadmin/teams', { method: 'POST', headers: authHeaders(token), body: JSON.stringify(body) }),
   updateTeam: (token: string, teamId: number, body: Record<string, any>) =>
     req<TeamAdminView>(`/superadmin/teams/${teamId}`, {
       method: 'PUT',
       headers: authHeaders(token),
       body: JSON.stringify(body),
+    }),
+  regenerateAdminLink: (token: string, teamId: number) =>
+    req<TeamAdminView>(`/superadmin/teams/${teamId}/regenerate-admin-link`, {
+      method: 'POST',
+      headers: authHeaders(token),
     }),
   deleteTeam: (token: string, teamId: number) =>
     req<{ ok: boolean }>(`/superadmin/teams/${teamId}`, { method: 'DELETE', headers: authHeaders(token) }),

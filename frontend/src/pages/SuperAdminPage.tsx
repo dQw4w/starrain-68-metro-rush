@@ -154,7 +154,6 @@ function TeamsTab({
 }) {
   const [name, setName] = useState('')
   const [color, setColor] = useState('#3B82F6')
-  const [pin, setPin] = useState('')
   const [meetingStationId, setMeetingStationId] = useState<number | ''>('')
   const [busy, setBusy] = useState(false)
   const [editingId, setEditingId] = useState<number | null>(null)
@@ -166,11 +165,9 @@ function TeamsTab({
       await api.createTeam(token, {
         name,
         color_hex: color,
-        admin_pin: pin,
         meeting_station_id: meetingStationId === '' ? undefined : Number(meetingStationId),
       })
       setName('')
-      setPin('')
       setMeetingStationId('')
       onChanged()
     } catch (e: any) {
@@ -187,6 +184,16 @@ function TeamsTab({
       onChanged()
     } catch (e: any) {
       onError(e.message || '刪除隊伍失敗')
+    }
+  }
+
+  async function regenerateLink(t: TeamAdminView) {
+    if (!window.confirm(`確定要重新產生「${t.name}」的管理員連結嗎？舊連結將立即失效（包含已登入的裝置）。`)) return
+    try {
+      await api.regenerateAdminLink(token, t.id)
+      onChanged()
+    } catch (e: any) {
+      onError(e.message || '重新產生連結失敗')
     }
   }
 
@@ -213,6 +220,7 @@ function TeamsTab({
               team={t}
               onEdit={() => setEditingId(t.id)}
               onDelete={() => deleteTeam(t)}
+              onRegenerateLink={() => regenerateLink(t)}
               canDelete={!configLocked}
             />
           )
@@ -222,20 +230,13 @@ function TeamsTab({
       {!configLocked && (
         <form onSubmit={createTeam} className="bg-white/5 rounded-xl p-3 flex flex-col gap-2">
           <p className="font-bold text-sm">新增隊伍</p>
-          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="隊名" required className="bg-white/10 rounded-lg px-3 py-2 text-sm" />
           <div className="flex gap-2">
             <input type="color" value={color} onChange={(e) => setColor(e.target.value)} className="h-10 w-14 bg-white/10 rounded-lg" />
-            <input
-              value={pin}
-              onChange={(e) => setPin(e.target.value)}
-              placeholder="管理員 PIN 碼"
-              required
-              className="flex-1 bg-white/10 rounded-lg px-3 py-2 text-sm"
-            />
+            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="隊名" required className="flex-1 bg-white/10 rounded-lg px-3 py-2 text-sm" />
           </div>
           <StationSelect stations={stations} value={meetingStationId} onChange={setMeetingStationId} />
           <button disabled={busy} className="bg-emerald-600 disabled:opacity-40 rounded-lg py-2 font-bold text-sm">
-            新增
+            新增（建立後會自動產生管理員專屬連結）
           </button>
         </form>
       )}
@@ -273,14 +274,17 @@ function TeamRow({
   team,
   onEdit,
   onDelete,
+  onRegenerateLink,
   canDelete,
 }: {
   team: TeamAdminView
   onEdit: () => void
   onDelete: () => void
+  onRegenerateLink: () => void
   canDelete: boolean
 }) {
   const playerUrl = `${window.location.origin}/team/${team.share_token}`
+  const adminUrl = `${window.location.origin}/admin/link/${team.admin_share_token}`
   return (
     <div className={`bg-white/5 rounded-xl p-3 flex flex-col gap-2 ${!team.active ? 'opacity-50' : ''}`}>
       <div className="flex items-center gap-3">
@@ -301,18 +305,42 @@ function TeamRow({
           進入審核
         </Link>
       </div>
-      <div className="flex items-center gap-2 bg-black/20 rounded-lg px-2 py-1.5">
-        <a href={playerUrl} target="_blank" rel="noreferrer" className="flex-1 text-xs text-blue-300 truncate">
-          {playerUrl}
-        </a>
-        <button
-          type="button"
-          onClick={() => navigator.clipboard.writeText(playerUrl)}
-          className="text-xs bg-white/10 rounded px-2 py-1 shrink-0"
-        >
-          複製連結
-        </button>
+
+      <div>
+        <p className="text-xs text-white/40 mb-1">玩家連結（給隊員）</p>
+        <div className="flex items-center gap-2 bg-black/20 rounded-lg px-2 py-1.5">
+          <a href={playerUrl} target="_blank" rel="noreferrer" className="flex-1 text-xs text-blue-300 truncate">
+            {playerUrl}
+          </a>
+          <button
+            type="button"
+            onClick={() => navigator.clipboard.writeText(playerUrl)}
+            className="text-xs bg-white/10 rounded px-2 py-1 shrink-0"
+          >
+            複製連結
+          </button>
+        </div>
       </div>
+
+      <div>
+        <p className="text-xs text-white/40 mb-1">管理員連結（只給該隊隨隊管理員，請勿外流）</p>
+        <div className="flex items-center gap-2 bg-black/20 rounded-lg px-2 py-1.5">
+          <a href={adminUrl} target="_blank" rel="noreferrer" className="flex-1 text-xs text-amber-300 truncate">
+            {adminUrl}
+          </a>
+          <button
+            type="button"
+            onClick={() => navigator.clipboard.writeText(adminUrl)}
+            className="text-xs bg-white/10 rounded px-2 py-1 shrink-0"
+          >
+            複製連結
+          </button>
+          <button type="button" onClick={onRegenerateLink} className="text-xs bg-white/10 rounded px-2 py-1 shrink-0">
+            重新產生
+          </button>
+        </div>
+      </div>
+
       {canDelete && (
         <button onClick={onDelete} className="text-xs text-rose-400 self-start">
           刪除隊伍
@@ -341,7 +369,6 @@ function TeamEditForm({
   const [color, setColor] = useState(team.color_hex)
   const [meetingStationId, setMeetingStationId] = useState<number | ''>(team.meeting_station_id ?? '')
   const [active, setActive] = useState(team.active)
-  const [pin, setPin] = useState('')
   const [busy, setBusy] = useState(false)
 
   async function save(e: React.FormEvent) {
@@ -353,7 +380,6 @@ function TeamEditForm({
         color_hex: color,
         meeting_station_id: meetingStationId === '' ? null : Number(meetingStationId),
         active,
-        ...(pin ? { admin_pin: pin } : {}),
       })
       onDone()
     } catch (e: any) {
@@ -366,15 +392,9 @@ function TeamEditForm({
   return (
     <form onSubmit={save} className="bg-white/10 rounded-xl p-3 flex flex-col gap-2 ring-1 ring-white/20">
       <p className="font-bold text-sm">編輯隊伍</p>
-      <input value={name} onChange={(e) => setName(e.target.value)} placeholder="隊名" required className="bg-white/10 rounded-lg px-3 py-2 text-sm" />
       <div className="flex gap-2">
         <input type="color" value={color} onChange={(e) => setColor(e.target.value)} className="h-10 w-14 bg-white/10 rounded-lg" />
-        <input
-          value={pin}
-          onChange={(e) => setPin(e.target.value)}
-          placeholder="重設 PIN 碼（留空則不變更）"
-          className="flex-1 bg-white/10 rounded-lg px-3 py-2 text-sm"
-        />
+        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="隊名" required className="flex-1 bg-white/10 rounded-lg px-3 py-2 text-sm" />
       </div>
       <StationSelect stations={stations} value={meetingStationId} onChange={setMeetingStationId} />
       <label className="flex items-center gap-2 text-sm">

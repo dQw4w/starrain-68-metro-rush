@@ -69,19 +69,29 @@ CREATE TABLE IF NOT EXISTS teams (
     color_hex TEXT NOT NULL DEFAULT '#3B82F6',
     meeting_station_id INT REFERENCES stations(id),
     chips_balance INT NOT NULL DEFAULT 50,
-    admin_pin_hash TEXT NOT NULL,
     share_token TEXT UNIQUE NOT NULL,
     active BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- Team admin auth now lives entirely on the admins row (admin_share_token) —
+-- this was a duplicate that was never actually read for auth.
+ALTER TABLE teams DROP COLUMN IF EXISTS admin_pin_hash;
+
 CREATE TABLE IF NOT EXISTS admins (
     id SERIAL PRIMARY KEY,
     team_id INT REFERENCES teams(id),
     display_name TEXT NOT NULL,
-    pin_hash TEXT NOT NULL,
+    -- Super admin (team_id IS NULL) logs in with a PIN. Team admins instead
+    -- get a private, unguessable link (admin_share_token) — no PIN, no login
+    -- form; visiting the link grants a session directly.
+    pin_hash TEXT,
+    admin_share_token TEXT UNIQUE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+ALTER TABLE admins ALTER COLUMN pin_hash DROP NOT NULL;
+ALTER TABLE admins ADD COLUMN IF NOT EXISTS admin_share_token TEXT UNIQUE;
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_admins_one_per_team ON admins (team_id) WHERE team_id IS NOT NULL;
 

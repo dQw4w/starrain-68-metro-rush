@@ -2,7 +2,7 @@ import secrets
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from auth import AdminIdentity, hash_pin, require_superadmin
+from auth import AdminIdentity, require_superadmin
 from db import get_pool
 from models import (
     ActionLogEntry,
@@ -60,8 +60,9 @@ async def list_teams(_: AdminIdentity = Depends(require_superadmin)):
     pool = get_pool()
     rows = await pool.fetch(
         """
-        SELECT t.*, COALESCE(sc.cnt, 0) AS stations_owned
+        SELECT t.*, a.admin_share_token, COALESCE(sc.cnt, 0) AS stations_owned
         FROM teams t
+        JOIN admins a ON a.team_id = t.id
         LEFT JOIN (
             SELECT owner_team_id, COUNT(*) AS cnt FROM station_claims
             WHERE owner_team_id IS NOT NULL GROUP BY owner_team_id
@@ -73,7 +74,8 @@ async def list_teams(_: AdminIdentity = Depends(require_superadmin)):
         TeamAdminView(
             id=r["id"], name=r["name"], color_hex=r["color_hex"],
             meeting_station_id=r["meeting_station_id"], chips_balance=r["chips_balance"],
-            active=r["active"], stations_owned=r["stations_owned"], rank=0, share_token=r["share_token"],
+            active=r["active"], stations_owned=r["stations_owned"], rank=0,
+            share_token=r["share_token"], admin_share_token=r["admin_share_token"],
         )
         for r in rows
     ]
@@ -87,30 +89,31 @@ async def create_team(body: TeamCreate, admin: AdminIdentity = Depends(require_s
         raise HTTPException(status_code=400, detail="遊戲已開始，無法新增隊伍")
 
     share_token = secrets.token_urlsafe(8)
+    admin_share_token = secrets.token_urlsafe(24)
     async with pool.acquire() as conn:
         async with conn.transaction():
             team = await conn.fetchrow(
-                """INSERT INTO teams (name, color_hex, meeting_station_id, chips_balance, admin_pin_hash, share_token)
-                   VALUES ($1, $2, $3, $4, $5, $6) RETURNING *""",
-                body.name, body.color_hex, body.meeting_station_id, cfg["starting_chips"],
-                hash_pin(body.admin_pin), share_token,
+                """INSERT INTO teams (name, color_hex, meeting_station_id, chips_balance, share_token)
+                   VALUES ($1, $2, $3, $4, $5) RETURNING *""",
+                body.name, body.color_hex, body.meeting_station_id, cfg["starting_chips"], share_token,
             )
             await conn.execute(
-                "INSERT INTO admins (team_id, display_name, pin_hash) VALUES ($1, $2, $3)",
-                team["id"], f"{body.name} 隨隊管理員", hash_pin(body.admin_pin),
+                "INSERT INTO admins (team_id, display_name, admin_share_token) VALUES ($1, $2, $3)",
+                team["id"], f"{body.name} 隨隊管理員", admin_share_token,
             )
     await manager.broadcast_global("config_update")
     return TeamAdminView(
         id=team["id"], name=team["name"], color_hex=team["color_hex"],
         meeting_station_id=team["meeting_station_id"], chips_balance=team["chips_balance"],
-        active=team["active"], stations_owned=0, rank=0, share_token=team["share_token"],
+        active=team["active"], stations_owned=0, rank=0,
+        share_token=team["share_token"], admin_share_token=admin_share_token,
     )
 
 
 @router.put("/teams/{team_id}", response_model=TeamAdminView)
 async def update_team(team_id: int, body: TeamUpdate, admin: AdminIdentity = Depends(require_superadmin)):
     pool = get_pool()
-    fields = body.model_dump(exclude_unset=True, exclude={"admin_pin"})
+    fields = body.model_dump(exclude_unset=True)
     async with pool.acquire() as conn:
         async with conn.transaction():
             if fields:
@@ -124,10 +127,9 @@ async def update_team(team_id: int, body: TeamUpdate, admin: AdminIdentity = Dep
                 team = await conn.fetchrow("SELECT * FROM teams WHERE id = $1", team_id)
             if team is None:
                 raise HTTPException(status_code=404, detail="找不到此隊伍")
-            if body.admin_pin:
-                await conn.execute(
-                    "UPDATE admins SET pin_hash = $1 WHERE team_id = $2", hash_pin(body.admin_pin), team_id
-                )
+            admin_share_token = await conn.fetchval(
+                "SELECT admin_share_token FROM admins WHERE team_id = $1", team_id
+            )
     await manager.broadcast_global("config_update")
     stations_owned = await pool.fetchval(
         "SELECT COUNT(*) FROM station_claims WHERE owner_team_id = $1", team_id
@@ -135,7 +137,35 @@ async def update_team(team_id: int, body: TeamUpdate, admin: AdminIdentity = Dep
     return TeamAdminView(
         id=team["id"], name=team["name"], color_hex=team["color_hex"],
         meeting_station_id=team["meeting_station_id"], chips_balance=team["chips_balance"],
-        active=team["active"], stations_owned=stations_owned, rank=0, share_token=team["share_token"],
+        active=team["active"], stations_owned=stations_owned, rank=0,
+        share_token=team["share_token"], admin_share_token=admin_share_token,
+    )
+
+
+@router.post("/teams/{team_id}/regenerate-admin-link", response_model=TeamAdminView)
+async def regenerate_admin_link(team_id: int, admin: AdminIdentity = Depends(require_superadmin)):
+    """Rotates a team's admin link (e.g. it leaked) and kills any sessions
+    already minted from the old one, so access is fully cut over immediately."""
+    pool = get_pool()
+    new_token = secrets.token_urlsafe(24)
+    async with pool.acquire() as conn:
+        async with conn.transaction():
+            admin_row = await conn.fetchrow(
+                "UPDATE admins SET admin_share_token = $1 WHERE team_id = $2 RETURNING id",
+                new_token, team_id,
+            )
+            if admin_row is None:
+                raise HTTPException(status_code=404, detail="找不到此隊伍")
+            await conn.execute("DELETE FROM admin_sessions WHERE admin_id = $1", admin_row["id"])
+            team = await conn.fetchrow("SELECT * FROM teams WHERE id = $1", team_id)
+    stations_owned = await pool.fetchval(
+        "SELECT COUNT(*) FROM station_claims WHERE owner_team_id = $1", team_id
+    )
+    return TeamAdminView(
+        id=team["id"], name=team["name"], color_hex=team["color_hex"],
+        meeting_station_id=team["meeting_station_id"], chips_balance=team["chips_balance"],
+        active=team["active"], stations_owned=stations_owned, rank=0,
+        share_token=team["share_token"], admin_share_token=new_token,
     )
 
 

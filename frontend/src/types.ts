@@ -61,6 +61,7 @@ export interface TeamPublic {
 
 export interface TeamAdminView extends TeamPublic {
   share_token: string
+  admin_share_token: string
 }
 
 export interface TeamSelf {

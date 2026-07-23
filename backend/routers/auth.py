@@ -18,24 +18,35 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 @router.post("/login", response_model=LoginResponse)
 async def login(body: LoginRequest):
+    """Super admin only. Team admins never enter a PIN — see /login-link."""
     pool = get_pool()
-    if body.role == "super":
-        row = await pool.fetchrow("SELECT * FROM admins WHERE team_id IS NULL LIMIT 1")
-    else:
-        if body.team_id is None:
-            raise HTTPException(status_code=400, detail="team_id is required for team admin login")
-        row = await pool.fetchrow("SELECT * FROM admins WHERE team_id = $1", body.team_id)
-
-    if row is None or not verify_pin(body.pin, row["pin_hash"]):
+    row = await pool.fetchrow("SELECT * FROM admins WHERE team_id IS NULL LIMIT 1")
+    if row is None or row["pin_hash"] is None or not verify_pin(body.pin, row["pin_hash"]):
         raise HTTPException(status_code=401, detail="PIN 錯誤")
 
     token = await create_session(row["id"])
     return LoginResponse(
-        token=token,
-        admin_id=row["id"],
-        team_id=row["team_id"],
-        display_name=row["display_name"],
-        is_super=row["team_id"] is None,
+        token=token, admin_id=row["id"], team_id=row["team_id"],
+        display_name=row["display_name"], is_super=True,
+    )
+
+
+@router.post("/login-link/{admin_token}", response_model=LoginResponse)
+async def login_by_link(admin_token: str):
+    """Team admin access: the link itself is the credential — no PIN, no
+    login form. Visiting /admin/link/{token} in the frontend calls this once
+    to mint a normal session, then proceeds exactly like a PIN login would."""
+    pool = get_pool()
+    row = await pool.fetchrow(
+        "SELECT * FROM admins WHERE admin_share_token = $1 AND team_id IS NOT NULL", admin_token
+    )
+    if row is None:
+        raise HTTPException(status_code=404, detail="此連結無效或已被停用")
+
+    token = await create_session(row["id"])
+    return LoginResponse(
+        token=token, admin_id=row["id"], team_id=row["team_id"],
+        display_name=row["display_name"], is_super=False,
     )
 
 

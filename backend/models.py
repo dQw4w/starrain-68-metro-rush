@@ -9,8 +9,7 @@ from pydantic import BaseModel
 # ---------------------------------------------------------------------------
 
 class LoginRequest(BaseModel):
-    role: Literal["super", "team"]
-    team_id: Optional[int] = None
+    """Super admin only — team admins use a private link (see /auth/login-link), not a PIN."""
     pin: str
 
 
@@ -161,20 +160,19 @@ class TeamPublic(BaseModel):
 
 class TeamAdminView(TeamPublic):
     share_token: str
+    admin_share_token: str
 
 
 class TeamCreate(BaseModel):
     name: str
     color_hex: str = "#3B82F6"
     meeting_station_id: Optional[int] = None
-    admin_pin: str
 
 
 class TeamUpdate(BaseModel):
     name: Optional[str] = None
     color_hex: Optional[str] = None
     meeting_station_id: Optional[int] = None
-    admin_pin: Optional[str] = None
     active: Optional[bool] = None
 
 

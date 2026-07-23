@@ -58,14 +58,6 @@ async def get_map():
     return await _load_map_data()
 
 
-@router.get("/api/teams/public")
-async def list_teams_public():
-    """Minimal, non-sensitive team list (id/name/color) for the admin login screen."""
-    pool = get_pool()
-    rows = await pool.fetch("SELECT id, name, color_hex FROM teams WHERE active = TRUE ORDER BY id")
-    return [dict(r) for r in rows]
-
-
 @router.get("/api/config/public", response_model=PublicGameConfig)
 async def public_game_config():
     """Non-sensitive config fields team clients need to render UI (e.g. the

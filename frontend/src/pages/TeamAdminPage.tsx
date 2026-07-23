@@ -32,12 +32,7 @@ export default function TeamAdminPage() {
   const [error, setError] = useState('')
   const { phase, refetchPhase } = usePhase()
 
-  useEffect(() => {
-    if (!session || (!session.is_super && session.team_id !== teamId)) {
-      navigate('/admin/login')
-    }
-  }, [session, teamId, navigate])
-
+  const unauthorized = !session || (!session.is_super && session.team_id !== teamId)
   const token = session?.token || ''
 
   const refresh = useCallback(async () => {
@@ -109,10 +104,23 @@ export default function TeamAdminPage() {
 
   function logout() {
     clearAdminSession()
-    navigate('/admin/login')
+    if (session?.is_super) {
+      navigate('/admin/login')
+    } else {
+      window.location.reload()
+    }
   }
 
-  if (!session || !teamInfo) {
+  if (unauthorized) {
+    return (
+      <div className="h-screen flex flex-col items-center justify-center gap-2 bg-slate-900 text-white text-center px-6">
+        <p className="font-bold">此頁面需要隨隊管理員專屬連結才能訪問</p>
+        <p className="text-white/50 text-sm">請向總管理員索取貴隊的管理連結，或確認連結是否正確。</p>
+      </div>
+    )
+  }
+
+  if (!teamInfo) {
     return (
       <div className="h-screen flex items-center justify-center bg-slate-900 text-white">
         <p>載入中…</p>
