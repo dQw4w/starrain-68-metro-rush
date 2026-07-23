@@ -61,14 +61,18 @@ _CHALLENGES: list[tuple] = [
 async def seed(conn) -> None:
     """Idempotent upsert by `name`. `pool_state` is intentionally absent from
     the ON CONFLICT SET clause — only set on first INSERT — so redeploying
-    mid-event never resets a challenge that's already gone active/retired."""
+    mid-event never resets a challenge that's already gone active/retired.
+
+    `name` is the map-visible title (location-flavored only, e.g. "饒河街任務")
+    — `inner_title` is the real/flavor title, hidden alongside `description`
+    until a team's attempt is approved to start."""
     for name, ctype, reward_config, location_name, lat, lng, initial_state in _CHALLENGES:
         await conn.execute(
-            """INSERT INTO challenges (name, description, type, reward_config, location_name, lat, lng, pool_state)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            """INSERT INTO challenges (name, inner_title, description, type, reward_config, location_name, lat, lng, pool_state)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
                ON CONFLICT (name) DO UPDATE
-               SET description = EXCLUDED.description, type = EXCLUDED.type,
+               SET inner_title = EXCLUDED.inner_title, description = EXCLUDED.description, type = EXCLUDED.type,
                    reward_config = EXCLUDED.reward_config, location_name = EXCLUDED.location_name,
                    lat = EXCLUDED.lat, lng = EXCLUDED.lng""",
-            name, TBD, ctype, json.dumps(reward_config), location_name, lat, lng, initial_state,
+            name, TBD, TBD, ctype, json.dumps(reward_config), location_name, lat, lng, initial_state,
         )

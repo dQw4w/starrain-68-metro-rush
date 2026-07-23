@@ -650,6 +650,7 @@ function ChallengesTab({
   onError: (m: string) => void
 }) {
   const [name, setName] = useState('')
+  const [innerTitle, setInnerTitle] = useState('')
   const [description, setDescription] = useState('')
   const [type, setType] = useState<Challenge['type']>('fixed')
   const [locationName, setLocationName] = useState('')
@@ -671,6 +672,7 @@ function ChallengesTab({
     try {
       await api.createChallenge(token, {
         name,
+        inner_title: innerTitle,
         description,
         type,
         reward_config: rewardConfig(),
@@ -680,6 +682,7 @@ function ChallengesTab({
         pool_state: 'queued',
       })
       setName('')
+      setInnerTitle('')
       setDescription('')
       setLocationName('')
       setLat('')
@@ -725,6 +728,7 @@ function ChallengesTab({
               <p className="font-bold">{c.name}</p>
               <span className="text-xs text-white/50">{c.pool_state}</span>
             </div>
+            {c.inner_title && <p className="text-xs text-amber-300">{c.inner_title}</p>}
             <p className="text-xs text-white/50">{c.type}</p>
             <div className="flex gap-2 mt-2">
               {c.pool_state !== 'active' && (
@@ -744,7 +748,19 @@ function ChallengesTab({
 
       <form onSubmit={createChallenge} className="bg-white/5 rounded-xl p-3 flex flex-col gap-2">
         <p className="font-bold text-sm">新增任務</p>
-        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="任務名稱" required className="bg-white/10 rounded-lg px-3 py-2 text-sm" />
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="地圖顯示名稱（僅地點提示，如：饒河街任務）"
+          required
+          className="bg-white/10 rounded-lg px-3 py-2 text-sm"
+        />
+        <input
+          value={innerTitle}
+          onChange={(e) => setInnerTitle(e.target.value)}
+          placeholder="任務內部標題（核准開始後才顯示給隊伍）"
+          className="bg-white/10 rounded-lg px-3 py-2 text-sm"
+        />
         <textarea
           value={description}
           onChange={(e) => setDescription(e.target.value)}

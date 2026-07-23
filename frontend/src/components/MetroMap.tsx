@@ -1,4 +1,6 @@
-import { CircleMarker, MapContainer, Polyline, TileLayer, Tooltip } from 'react-leaflet'
+import L from 'leaflet'
+import { CircleMarker, MapContainer, Marker, Polyline, TileLayer, Tooltip } from 'react-leaflet'
+import { CHALLENGE_TYPE_LABELS, challengeIconHtml } from './ChallengeIcon'
 import type { ChallengeTeaser, DevicePosition, MapData, Station, TeamPublic } from '../types'
 
 interface MetroMapProps {
@@ -75,17 +77,19 @@ export default function MetroMap({
         (ch) =>
           ch.lat != null &&
           ch.lng != null && (
-            <CircleMarker
+            <Marker
               key={`c-${ch.id}`}
-              center={[ch.lat, ch.lng]}
-              radius={9}
-              pathOptions={{ color: '#5B21B6', weight: 2, fillColor: '#A78BFA', fillOpacity: 0.95 }}
+              position={[ch.lat, ch.lng]}
+              icon={L.divIcon({ className: '', html: challengeIconHtml(ch), iconSize: [28, 28], iconAnchor: [14, 14] })}
               eventHandlers={onChallengeClick ? { click: () => onChallengeClick(ch) } : undefined}
             >
-              <Tooltip direction="top" offset={[0, -8]}>
-                {ch.name}
+              <Tooltip direction="top" offset={[0, -16]}>
+                <div>
+                  <div style={{ fontWeight: 700 }}>{ch.name}</div>
+                  <div>{CHALLENGE_TYPE_LABELS[ch.type]}</div>
+                </div>
               </Tooltip>
-            </CircleMarker>
+            </Marker>
           )
       )}
 

@@ -22,7 +22,10 @@ def _to_challenge(row) -> Challenge:
 async def list_active_challenges():
     pool = get_pool()
     rows = await pool.fetch("SELECT * FROM challenges WHERE pool_state = 'active' ORDER BY id")
-    return [ChallengeTeaser(**{k: v for k, v in _to_challenge(r).model_dump().items() if k != "description"}) for r in rows]
+    return [
+        ChallengeTeaser(**{k: v for k, v in _to_challenge(r).model_dump().items() if k in ChallengeTeaser.model_fields})
+        for r in rows
+    ]
 
 
 @router.get("/api/team/{token}/challenge/{challenge_id}", response_model=Challenge)
@@ -56,9 +59,9 @@ async def list_all_challenges(_: AdminIdentity = Depends(require_superadmin)):
 async def create_challenge(body: ChallengeCreate, _: AdminIdentity = Depends(require_superadmin)):
     pool = get_pool()
     row = await pool.fetchrow(
-        """INSERT INTO challenges (name, description, type, reward_config, location_name, lat, lng, image_url, pool_state)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *""",
-        body.name, body.description, body.type, json.dumps(body.reward_config), body.location_name,
+        """INSERT INTO challenges (name, inner_title, description, type, reward_config, location_name, lat, lng, image_url, pool_state)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *""",
+        body.name, body.inner_title, body.description, body.type, json.dumps(body.reward_config), body.location_name,
         body.lat, body.lng, body.image_url, body.pool_state,
     )
     if body.pool_state == "active":

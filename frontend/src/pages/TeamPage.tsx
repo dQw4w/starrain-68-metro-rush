@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom'
 import { api } from '../api'
 import ActionLogList from '../components/ActionLogList'
 import ChallengeModal from '../components/ChallengeModal'
+import { ChallengeIconBadge } from '../components/ChallengeIcon'
 import ClaimSheet from '../components/ClaimSheet'
 import GameClock from '../components/GameClock'
 import MetroMap from '../components/MetroMap'
@@ -122,14 +123,23 @@ export default function TeamPage() {
     return () => navigator.geolocation.clearWatch(watchId)
   }, [token])
 
+  // Cleared only when switching challenges (not on every attempt-status
+  // refetch below) so a stale previous challenge's detail never flashes.
+  useEffect(() => {
+    setChallengeDetail(null)
+  }, [selectedChallenge?.id])
+
   useEffect(() => {
     if (!token || !selectedChallenge) return
-    setChallengeDetail(null)
+    // Re-fetches whenever myAttempts changes (not just when the selected
+    // challenge itself changes) — the attempt starts out gated behind a 403
+    // (not yet approved to start), and only a refetch after admin approval
+    // actually reveals inner_title/description.
     api
       .challengeDetail(token, selectedChallenge.id)
       .then(setChallengeDetail)
       .catch(() => setChallengeDetail(null))
-  }, [token, selectedChallenge])
+  }, [token, selectedChallenge, myAttempts])
 
   if (!token) return null
   if (!state || !mapData) {
@@ -309,9 +319,12 @@ function TabContent({
           <button
             key={c.id}
             onClick={() => onSelectChallenge(c)}
-            className="text-left bg-white/5 rounded-lg px-3 py-2 text-sm flex justify-between items-center"
+            className="text-left bg-white/5 rounded-lg px-3 py-2 text-sm flex justify-between items-center gap-2"
           >
-            <span className="font-medium">{c.name}</span>
+            <span className="flex items-center gap-2 min-w-0">
+              <ChallengeIconBadge challenge={c} size={22} />
+              <span className="font-medium truncate">{c.name}</span>
+            </span>
             <StatusBadge attempt={attempt} />
           </button>
         )

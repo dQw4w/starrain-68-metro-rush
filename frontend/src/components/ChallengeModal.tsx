@@ -1,11 +1,10 @@
 import { useEffect, useState } from 'react'
+import { CHALLENGE_TYPE_LABELS, ChallengeIconBadge } from './ChallengeIcon'
 import type { Challenge, ChallengeAttempt, ChallengeTeaser, TeamPublic } from '../types'
 
 const TYPE_LABELS: Record<string, string> = {
-  fixed: '固定獎勵',
+  ...CHALLENGE_TYPE_LABELS,
   variable: '猜拳式獎勵（需先喊出目標數量）',
-  steal: '偷竊任務',
-  multiplier: '倍率任務',
 }
 
 interface Props {
@@ -76,9 +75,17 @@ export default function ChallengeModal({
         className="bg-slate-800 text-white rounded-t-2xl sm:rounded-2xl w-full sm:max-w-md max-h-[85vh] overflow-y-auto p-5"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex justify-between items-start gap-2 mb-2">
-          <h2 className="text-xl font-bold">{teaser.name}</h2>
-          <button onClick={onClose} className="text-white/50 text-2xl leading-none">
+        <div className="flex justify-between items-start gap-3 mb-2">
+          <div className="flex items-center gap-3">
+            <ChallengeIconBadge challenge={teaser} size={36} />
+            <div>
+              <h2 className="text-xl font-bold">{teaser.name}</h2>
+              {fullDetail && fullDetail.inner_title && (
+                <p className="text-sm text-amber-300 font-medium">{fullDetail.inner_title}</p>
+              )}
+            </div>
+          </div>
+          <button onClick={onClose} className="text-white/50 text-2xl leading-none shrink-0">
             &times;
           </button>
         </div>

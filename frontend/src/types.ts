@@ -117,7 +117,10 @@ export interface ApprovalRequest {
 
 export interface Challenge {
   id: number
+  /** Map-visible title — location-flavored only, e.g. "饒河街任務". Never hints at the task. */
   name: string
+  /** Real/flavor title — hidden alongside `description` until the attempt is approved to start. */
+  inner_title: string
   description: string
   type: ChallengeType
   reward_config: Record<string, any>
@@ -128,8 +131,8 @@ export interface Challenge {
   pool_state: PoolState
 }
 
-/** Public listing shape: no `description` — hidden until a team's admin approves the start. */
-export type ChallengeTeaser = Omit<Challenge, 'description'>
+/** Public listing shape: no `inner_title`/`description` — hidden until a team's admin approves the start. */
+export type ChallengeTeaser = Omit<Challenge, 'inner_title' | 'description'>
 
 export interface ChallengeAttempt {
   id: number

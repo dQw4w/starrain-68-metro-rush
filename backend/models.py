@@ -253,6 +253,10 @@ RewardConfig = dict[str, Any]
 class Challenge(BaseModel):
     id: int
     name: str
+    # Real/flavor title + task text — both hidden from the map, only present
+    # here (never in ChallengeTeaser) so they only reach a team once their
+    # attempt is approved to start.
+    inner_title: str
     description: str
     type: Literal["fixed", "variable", "steal", "multiplier"]
     reward_config: RewardConfig
@@ -280,6 +284,7 @@ class ChallengeTeaser(BaseModel):
 
 class ChallengeCreate(BaseModel):
     name: str
+    inner_title: str = ""
     description: str
     type: Literal["fixed", "variable", "steal", "multiplier"]
     reward_config: RewardConfig
@@ -292,6 +297,7 @@ class ChallengeCreate(BaseModel):
 
 class ChallengeUpdate(BaseModel):
     name: Optional[str] = None
+    inner_title: Optional[str] = None
     description: Optional[str] = None
     type: Optional[Literal["fixed", "variable", "steal", "multiplier"]] = None
     reward_config: Optional[RewardConfig] = None

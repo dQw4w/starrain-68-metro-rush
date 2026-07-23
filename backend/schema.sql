@@ -121,7 +121,13 @@ ALTER TABLE station_claims ADD COLUMN IF NOT EXISTS cap INT NOT NULL DEFAULT 5;
 
 CREATE TABLE IF NOT EXISTS challenges (
     id SERIAL PRIMARY KEY,
+    -- Map-visible title: location-flavored only (e.g. "饒河街任務"), must never
+    -- hint at the actual task. The real/flavor title lives in `inner_title` and,
+    -- like `description`, is only revealed to a team once their attempt has
+    -- been approved to start (see routers/challenges.py's teaser filtering and
+    -- the team-scoped detail endpoint's attempt-status gate).
     name TEXT NOT NULL,
+    inner_title TEXT NOT NULL DEFAULT '',
     description TEXT NOT NULL,
     type TEXT NOT NULL CHECK (type IN ('fixed', 'variable', 'steal', 'multiplier')),
     reward_config JSONB NOT NULL DEFAULT '{}'::jsonb,
@@ -132,6 +138,8 @@ CREATE TABLE IF NOT EXISTS challenges (
     pool_state TEXT NOT NULL DEFAULT 'queued' CHECK (pool_state IN ('queued', 'active', 'retired')),
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+ALTER TABLE challenges ADD COLUMN IF NOT EXISTS inner_title TEXT NOT NULL DEFAULT '';
 
 -- Lets seed_challenges.py upsert by name instead of inserting a fresh
 -- duplicate row every time the seed data changes.

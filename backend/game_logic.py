@@ -353,6 +353,34 @@ async def create_challenge_start_request(team_id: int, challenge_id: int, called
                 if challenge["type"] == "steal" and target_team_id is None:
                     raise HTTPException(status_code=400, detail="偷竊任務需指定目標隊伍")
 
+                # Exclusivity: one challenge is worked on by at most one team at a
+                # time (freed up again if that team fails — a success takes the
+                # challenge down entirely, see resolve_challenge_result), and one
+                # team works on at most one challenge at a time. This is a UX-level
+                # early rejection; resolve_challenge_start re-checks the same
+                # invariants at approval time (authoritative, race-safe under FOR
+                # UPDATE) since two requests can be created before either is judged.
+                other_in_progress = await conn.fetchrow(
+                    """SELECT id FROM challenge_attempts
+                       WHERE challenge_id = $1 AND status IN ('in_progress', 'pending_result')""",
+                    challenge_id,
+                )
+                if other_in_progress is not None:
+                    raise HTTPException(status_code=400, detail="此任務目前有其他隊伍正在進行中，請稍後再試")
+                other_pending_start = await conn.fetchrow(
+                    """SELECT id FROM approval_requests
+                       WHERE challenge_id = $1 AND kind = 'challenge_start' AND status = 'pending' AND team_id != $2""",
+                    challenge_id, team_id,
+                )
+                if other_pending_start is not None:
+                    raise HTTPException(status_code=400, detail="此任務目前有其他隊伍正在申請開始，請稍後再試")
+                team_busy = await conn.fetchrow(
+                    "SELECT id FROM challenge_attempts WHERE team_id = $1 AND status IN ('in_progress', 'pending_result')",
+                    team_id,
+                )
+                if team_busy is not None:
+                    raise HTTPException(status_code=400, detail="貴隊目前已有進行中的任務，請先完成後再嘗試新任務")
+
                 req = await conn.fetchrow(
                     """INSERT INTO approval_requests (kind, team_id, challenge_id, requested_by, requested_value, status)
                        VALUES ('challenge_start', $1, $2, $3, $4, 'pending') RETURNING *""",
@@ -395,7 +423,20 @@ async def resolve_challenge_start(request_id: int, admin_id: int, approve: bool)
                     "SELECT id FROM challenge_attempts WHERE challenge_id = $1 AND team_id = $2",
                     req["challenge_id"], req["team_id"],
                 )
-                if challenge["pool_state"] != "active" or already is not None:
+                # Authoritative re-check (see create_challenge_start_request): under
+                # the row lock above, only one of two racing approvals can ever see
+                # a clean slate here — the loser is marked stale, same as any other
+                # invalidated request.
+                other_in_progress = await conn.fetchrow(
+                    """SELECT id FROM challenge_attempts
+                       WHERE challenge_id = $1 AND status IN ('in_progress', 'pending_result')""",
+                    req["challenge_id"],
+                )
+                team_busy = await conn.fetchrow(
+                    "SELECT id FROM challenge_attempts WHERE team_id = $1 AND status IN ('in_progress', 'pending_result')",
+                    req["team_id"],
+                )
+                if challenge["pool_state"] != "active" or already is not None or other_in_progress is not None or team_busy is not None:
                     await conn.execute(
                         "UPDATE approval_requests SET status = 'stale', resolved_by = $1, resolved_at = now() WHERE id = $2",
                         admin_id, request_id,
@@ -600,14 +641,23 @@ async def resolve_challenge_result(request_id: int, admin_id: int, success: bool
             if reward_amount:
                 events.append(("broadcast_global", "ranking_update"))
 
-            # Pool lifecycle: retire once every active team has used its one attempt on this
-            # challenge, then top up the active pool from the queued backlog.
-            active_team_count = await conn.fetchval("SELECT COUNT(*) FROM teams WHERE active = TRUE")
-            resolved_count = await conn.fetchval(
-                "SELECT COUNT(*) FROM challenge_attempts WHERE challenge_id = $1 AND status IN ('success','failed')",
-                challenge["id"],
-            )
-            if resolved_count >= active_team_count:
+            # Pool lifecycle: a challenge can only ever be cleared by one team — the
+            # moment any team succeeds, it's taken down immediately (no other team
+            # may start it afterward, even if they hadn't gone yet; see the
+            # exclusivity checks in create/resolve_challenge_start for the "only one
+            # team working on it at a time" half of this rule). If nobody succeeds,
+            # it stays active/available to the remaining teams until every active
+            # team has attempted and failed, at which point it's taken down too.
+            # Either way, retiring always tops the active pool back up.
+            should_retire = success
+            if not should_retire:
+                active_team_count = await conn.fetchval("SELECT COUNT(*) FROM teams WHERE active = TRUE")
+                resolved_count = await conn.fetchval(
+                    "SELECT COUNT(*) FROM challenge_attempts WHERE challenge_id = $1 AND status IN ('success','failed')",
+                    challenge["id"],
+                )
+                should_retire = resolved_count >= active_team_count
+            if should_retire:
                 await conn.execute("UPDATE challenges SET pool_state = 'retired' WHERE id = $1", challenge["id"])
                 await _refill_pool(conn)
                 events.append(("broadcast_global", "challenge_pool"))
@@ -616,10 +666,19 @@ async def resolve_challenge_result(request_id: int, admin_id: int, success: bool
     return result
 
 
+MIN_ACTIVE_CHALLENGES = 3
+
+
 async def _refill_pool(conn) -> None:
+    """Activates challenges from the queued backlog after a retirement — by the
+    configured refill amount (default 2, matching the "activate 2 random new
+    ones" rule), but never leaving the active pool below MIN_ACTIVE_CHALLENGES
+    even if refill/admin config would otherwise allow it."""
     cfg = await conn.fetchrow("SELECT * FROM game_config WHERE id = 1")
     active_count = await conn.fetchval("SELECT COUNT(*) FROM challenges WHERE pool_state = 'active'")
-    slots = min(cfg["challenge_pool_refill"], cfg["challenge_pool_max"] - active_count)
+    target = max(active_count + cfg["challenge_pool_refill"], MIN_ACTIVE_CHALLENGES)
+    target = min(target, cfg["challenge_pool_max"])
+    slots = target - active_count
     if slots <= 0:
         return
     candidates = await conn.fetch("SELECT id FROM challenges WHERE pool_state = 'queued'")
@@ -637,7 +696,8 @@ async def activate_initial_pool() -> None:
         async with conn.transaction():
             cfg = await conn.fetchrow("SELECT * FROM game_config WHERE id = 1")
             active_count = await conn.fetchval("SELECT COUNT(*) FROM challenges WHERE pool_state = 'active'")
-            slots = cfg["challenge_pool_initial"] - active_count
+            target = max(cfg["challenge_pool_initial"], MIN_ACTIVE_CHALLENGES)
+            slots = target - active_count
             if slots > 0:
                 candidates = await conn.fetch("SELECT id FROM challenges WHERE pool_state = 'queued'")
                 chosen = random.sample(candidates, k=min(slots, len(candidates))) if candidates else []
