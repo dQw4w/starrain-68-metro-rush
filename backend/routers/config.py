@@ -15,7 +15,7 @@ from models import (
     TeamCreate,
     TeamUpdate,
 )
-from game_logic import get_phase, get_ranking
+from game_logic import activate_initial_pool, get_phase, get_ranking
 from ws import manager
 
 router = APIRouter(prefix="/api/superadmin", tags=["superadmin"])
@@ -347,3 +347,48 @@ async def reset_team(team_id: int, _: AdminIdentity = Depends(require_superadmin
         message="總管理員重置此隊伍的所有進度", chip_delta=None,
     )
     return await _team_admin_view_by_id(pool, team_id)
+
+
+@router.post("/reset-game", response_model=dict)
+async def reset_game(_: AdminIdentity = Depends(require_superadmin)):
+    """Whole-event reset: every team back to starting chips with 0 stations,
+    every challenge attempt/approval wiped, and the challenge pool restarted
+    from scratch (back to 'queued', then the initial batch re-activated) —
+    for resetting a full dry run/rehearsal back to a clean slate before the
+    real event. Deliberately leaves game_config (schedule, lock, PIN) alone."""
+    pool = get_pool()
+    async with pool.acquire() as conn:
+        async with conn.transaction():
+            cfg = await conn.fetchrow("SELECT starting_chips, max_deposit_per_visit FROM game_config WHERE id = 1")
+            team_ids = [r["id"] for r in await conn.fetch("SELECT id FROM teams")]
+            await conn.execute("UPDATE teams SET chips_balance = $1", cfg["starting_chips"])
+            await conn.execute(
+                "UPDATE station_claims SET owner_team_id = NULL, value = 0, cap = $1, updated_at = now()",
+                cfg["max_deposit_per_visit"],
+            )
+            # approval_requests before challenge_attempts: challenge_attempt_id
+            # has no ON DELETE CASCADE, so the referencing side must go first.
+            await conn.execute("DELETE FROM approval_requests")
+            await conn.execute("DELETE FROM challenge_attempts")
+            await conn.execute("UPDATE challenges SET pool_state = 'queued'")
+            await conn.execute("DELETE FROM action_log")
+            reset_msg = f"總管理員重置整個遊戲：所有隊伍代幣重置為 {cfg['starting_chips']} 枚，車站與任務進度全部清空"
+            await conn.execute(
+                """INSERT INTO action_log (team_id, actor, action_type, resulting_balance, message)
+                   VALUES (NULL, '總管理員', 'admin_adjust', $1, $2)""",
+                cfg["starting_chips"], reset_msg,
+            )
+    # Re-picks challenge_pool_initial (default 3) challenges at random from the
+    # now-all-queued pool, same as the first-ever "啟動初始任務池" — must run
+    # after the reset transaction commits (it opens its own).
+    await activate_initial_pool()
+    for team_id in team_ids:
+        await manager.notify_team(team_id, "team_update")
+        await manager.notify_admin(team_id, "admin_pending")
+    await manager.broadcast_global("map_update")
+    await manager.broadcast_global("ranking_update")
+    await manager.broadcast_global(
+        "activity_log", team_id=None, team_name="全體隊伍", action_type="admin_adjust",
+        message=reset_msg, chip_delta=None,
+    )
+    return {"ok": True}

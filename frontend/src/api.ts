@@ -131,6 +131,8 @@ export const api = {
     }),
   resetTeam: (token: string, teamId: number) =>
     req<TeamAdminView>(`/superadmin/teams/${teamId}/reset`, { method: 'POST', headers: authHeaders(token) }),
+  resetGame: (token: string) =>
+    req<{ ok: boolean }>('/superadmin/reset-game', { method: 'POST', headers: authHeaders(token) }),
   overview: (token: string) => req<{ ranking: (TeamPublicWithPending)[] }>('/superadmin/overview', { headers: authHeaders(token) }),
   globalLog: (token: string) => req<ActionLogEntry[]>('/superadmin/log', { headers: authHeaders(token) }),
 

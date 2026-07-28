@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { api } from '../api'
 import ActionLogList from '../components/ActionLogList'
 import GameClock from '../components/GameClock'
@@ -9,13 +9,12 @@ import StationCoordEditor from '../components/StationCoordEditor'
 import ToastStack, { useToastQueue } from '../components/ToastStack'
 import { usePhase } from '../hooks/usePhase'
 import { useWebSocket, type WsEvent } from '../hooks/useWebSocket'
-import { clearAdminSession, loadAdminSession } from '../lib/adminSession'
+import { clearAdminSession, loadAdminSession, saveAdminSession } from '../lib/adminSession'
 import type { ActionLogEntry, Challenge, GameConfig, MapData, Station, StationClaim, TeamAdminView } from '../types'
 
 type Tab = 'overview' | 'teams' | 'config' | 'challenges' | 'waypoints' | 'log'
 
 export default function SuperAdminPage() {
-  const navigate = useNavigate()
   const session = loadAdminSession()
   const token = session?.token || ''
 
@@ -28,10 +27,6 @@ export default function SuperAdminPage() {
   const [error, setError] = useState('')
   const { phase, refetchPhase } = usePhase()
   const { toasts, push: pushToast } = useToastQueue()
-
-  useEffect(() => {
-    if (!session || !session.is_super) navigate('/admin/login')
-  }, [session, navigate])
 
   const refresh = useCallback(async () => {
     if (!token) return
@@ -70,7 +65,14 @@ export default function SuperAdminPage() {
 
   function logout() {
     clearAdminSession()
-    navigate('/admin/login')
+    // Full reload (rather than local state) so the WebSocket connection and
+    // every in-flight fetch tied to the old session's token are torn down
+    // cleanly, same as the fresh mount a successful login below relies on.
+    window.location.reload()
+  }
+
+  if (!session || !session.is_super) {
+    return <SuperAdminLoginForm />
   }
 
   const ranking = [...teams].sort((a, b) => b.stations_owned - a.stations_owned || b.chips_balance - a.chips_balance)
@@ -105,7 +107,16 @@ export default function SuperAdminPage() {
       {error && <div className="bg-rose-600 text-white text-sm p-2 text-center">{error}</div>}
 
       <main className="flex-1 p-4 overflow-y-auto">
-        {tab === 'overview' && <RankingBoard ranking={ranking} />}
+        {tab === 'overview' && (
+          <div className="flex flex-col gap-4">
+            <RankingBoard ranking={ranking} />
+            <ResetGameButton
+              token={token}
+              onReset={refresh}
+              onError={(m) => setError(m)}
+            />
+          </div>
+        )}
 
         {tab === 'teams' && (
           <TeamsTab
@@ -143,6 +154,103 @@ export default function SuperAdminPage() {
 
         {tab === 'log' && <ActionLogList entries={log} />}
       </main>
+    </div>
+  )
+}
+
+function SuperAdminLoginForm() {
+  const [pin, setPin] = useState('')
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setBusy(true)
+    setError('')
+    try {
+      const session = await api.login(pin)
+      saveAdminSession(session)
+      // Full reload rather than local state so every hook above (WS ticket,
+      // data fetches, ...) starts fresh with the now-authenticated token.
+      window.location.reload()
+    } catch (e: any) {
+      setError(e.message || '登入失敗')
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="min-h-screen bg-slate-900 text-white flex items-center justify-center p-4">
+      <form onSubmit={handleSubmit} className="bg-slate-800 rounded-2xl p-6 w-full max-w-sm flex flex-col gap-4">
+        <h1 className="text-2xl font-black text-center">Metro Rush 總管理員登入</h1>
+        <p className="text-white/50 text-sm text-center">
+          隨隊管理員請使用總管理員提供的專屬連結，不需在此登入。
+        </p>
+
+        <input
+          type="password"
+          inputMode="numeric"
+          placeholder="PIN 碼"
+          value={pin}
+          onChange={(e) => setPin(e.target.value)}
+          required
+          autoFocus
+          className="bg-white/10 rounded-lg px-3 py-2.5"
+        />
+
+        {error && <p className="text-rose-400 text-sm">{error}</p>}
+
+        <button disabled={busy} type="submit" className="bg-emerald-600 disabled:opacity-40 font-bold rounded-lg py-2.5">
+          登入
+        </button>
+      </form>
+    </div>
+  )
+}
+
+function ResetGameButton({
+  token,
+  onReset,
+  onError,
+}: {
+  token: string
+  onReset: () => void
+  onError: (m: string) => void
+}) {
+  const [busy, setBusy] = useState(false)
+
+  async function handleClick() {
+    if (
+      !window.confirm(
+        '確定要重置整個遊戲嗎？\n\n此動作將把「所有隊伍」的代幣重置為初始值、釋出所有車站、清空所有任務進度與紀錄，並重新隨機開放初始任務。此動作無法復原！'
+      )
+    )
+      return
+    if (!window.confirm('再次確認：真的要重置整個遊戲的所有隊伍進度嗎？')) return
+    setBusy(true)
+    try {
+      await api.resetGame(token)
+      onReset()
+    } catch (e: any) {
+      onError(e.message || '重置失敗')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="bg-rose-950/40 ring-1 ring-rose-500/40 rounded-xl p-3 flex flex-col gap-2">
+      <p className="font-bold text-sm text-rose-300">危險區域</p>
+      <p className="text-xs text-white/50">
+        重置整個遊戲：所有隊伍代幣回到初始值、釋出所有車站、清空所有任務進度，並重新開放初始任務。此動作無法復原。
+      </p>
+      <button
+        disabled={busy}
+        onClick={handleClick}
+        className="self-start bg-rose-600 disabled:opacity-40 rounded-lg px-4 py-2 font-bold text-sm"
+      >
+        {busy ? '重置中…' : '重置整個遊戲'}
+      </button>
     </div>
   )
 }

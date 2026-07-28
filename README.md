@@ -37,9 +37,10 @@ npm run dev                   # http://localhost:5173, proxies /api + /ws to :80
 On first boot, the backend auto-runs `schema.sql` and seeds the full TRTC
 network (6 lines, ~117 stations — see `backend/seed_stations.py`) plus a
 single super-admin account using the PIN in `SUPERADMIN_BOOTSTRAP_PIN`
-(default `0000` — **change this before a real event**). Log in at
-`/admin/login` → 總管理員 to create teams (each team gets a share link
-`/team/{token}` and its own admin PIN) and set up challenges.
+(default `1129` — **change this before a real event**). Log in at
+`/superadmin` (the PIN form shows inline until you log in) → 總管理員 to
+create teams (each team gets a share link `/team/{token}` and its own admin
+PIN) and set up challenges.
 
 Station coordinates: ~108 of them come from real GIS open data; the
 Circular Line (環狀線, opened 2020) uses hand-estimated coordinates since
