@@ -10,6 +10,7 @@ const TYPE_LABELS: Record<string, string> = {
   challenge_result: '任務結果',
   challenge_stolen: '被偷代幣',
   challenge_auto_failed: '任務逾時失敗',
+  challenge_published: '新任務公佈',
   admin_adjust: '管理員調整',
 }
 
@@ -39,7 +40,7 @@ export default function ActionLogList({ entries }: { entries: ActionLogEntry[] }
           <div key={e.id} className="bg-white/5 rounded-lg px-3 py-2 text-sm">
             <div className="flex justify-between items-baseline gap-2">
               <span className="font-medium text-white">
-                <span className="text-white/50">{e.team_name}</span> · {TYPE_LABELS[e.action_type] || e.action_type}
+                <span className="text-white/50">{e.team_name || '全體'}</span> · {TYPE_LABELS[e.action_type] || e.action_type}
               </span>
               <span className="text-white/40 text-xs shrink-0">
                 {new Date(e.created_at).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' })}

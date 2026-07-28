@@ -86,17 +86,10 @@ async def deny_request(team_id: int, request_id: int, admin: AdminIdentity = Dep
         return await resolve_action_request(request_id, admin.admin_id, approve=False)
     if kind == "challenge_start":
         return await resolve_challenge_start(request_id, admin.admin_id, approve=False)
-    if kind == "challenge_result":
-        # "Deny" on a result submission just sends it back — team must resubmit. We
-        # implement this as denying the request without touching the attempt, so a
-        # fresh submit-result call can create a new pending request.
-        pool = get_pool()
-        await pool.execute(
-            "UPDATE approval_requests SET status = 'denied', resolved_by = $1, resolved_at = now() WHERE id = $2",
-            admin.admin_id, request_id,
-        )
-        await manager.notify_admin(team_id, "admin_pending")
-        return {"status": "denied"}
+    # challenge_result requests are auto-created once a start is approved and
+    # are only ever resolved via /approve (判定成功/判定失敗) — there's no
+    # "deny and let the team resubmit" path anymore, since the team never
+    # submits a result themselves.
     raise HTTPException(status_code=400, detail="未知的請求類型")
 
 
@@ -116,7 +109,7 @@ async def team_log(team_id: int, limit: int = Query(default=300, le=1000),
     assert_team_scope(admin, team_id)
     pool = get_pool()
     rows = await pool.fetch(
-        """SELECT al.*, t.name AS team_name FROM action_log al JOIN teams t ON t.id = al.team_id
+        """SELECT al.*, t.name AS team_name FROM action_log al LEFT JOIN teams t ON t.id = al.team_id
            ORDER BY al.created_at DESC LIMIT $1""",
         limit,
     )

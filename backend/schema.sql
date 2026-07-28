@@ -150,7 +150,7 @@ CREATE TABLE IF NOT EXISTS challenge_attempts (
     challenge_id INT NOT NULL REFERENCES challenges(id) ON DELETE CASCADE,
     team_id INT NOT NULL REFERENCES teams(id),
     status TEXT NOT NULL DEFAULT 'pending_start_approval' CHECK (
-        status IN ('pending_start_approval', 'in_progress', 'pending_result', 'success', 'failed')
+        status IN ('pending_start_approval', 'in_progress', 'success', 'failed')
     ),
     called_shot_value INT,
     achieved_value INT,
@@ -161,6 +161,15 @@ CREATE TABLE IF NOT EXISTS challenge_attempts (
     resolved_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     UNIQUE (challenge_id, team_id)
+);
+
+-- 'pending_result' used to sit between 'in_progress' and 'success'/'failed'
+-- (set once a team self-reported a result); the team admin now judges
+-- success/fail directly from 'in_progress', so that status is no longer
+-- ever written and has been dropped from the allowed set.
+ALTER TABLE challenge_attempts DROP CONSTRAINT IF EXISTS challenge_attempts_status_check;
+ALTER TABLE challenge_attempts ADD CONSTRAINT challenge_attempts_status_check CHECK (
+    status IN ('pending_start_approval', 'in_progress', 'success', 'failed')
 );
 
 CREATE TABLE IF NOT EXISTS approval_requests (
@@ -180,7 +189,7 @@ CREATE TABLE IF NOT EXISTS approval_requests (
 
 CREATE TABLE IF NOT EXISTS action_log (
     id SERIAL PRIMARY KEY,
-    team_id INT NOT NULL REFERENCES teams(id),
+    team_id INT REFERENCES teams(id),
     actor TEXT NOT NULL,
     action_type TEXT NOT NULL,
     station_id INT REFERENCES stations(id),
@@ -190,6 +199,12 @@ CREATE TABLE IF NOT EXISTS action_log (
     message TEXT NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- team_id is nullable for genuinely global events (e.g. "challenge_published"
+-- — a new challenge going live isn't any one team's action); every log read
+-- already queries the whole table rather than filtering by team, so a NULL
+-- row is visible everywhere without special-casing.
+ALTER TABLE action_log ALTER COLUMN team_id DROP NOT NULL;
 
 CREATE TABLE IF NOT EXISTS device_positions (
     team_id INT NOT NULL REFERENCES teams(id),

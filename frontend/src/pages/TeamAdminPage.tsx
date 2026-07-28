@@ -81,13 +81,16 @@ export default function TeamAdminPage() {
       if (ev.team_id !== undefined && ev.team_id !== teamId) return
       if (['admin_pending', 'team_update', 'gps_update'].includes(ev.type)) refresh()
       if (ev.type === 'map_update') api.getMap().then(setMapData)
-      if (ev.type === 'challenge_pool') api.getActiveChallenges().then(setChallenges)
+      if (ev.type === 'challenge_pool') {
+        api.getActiveChallenges().then(setChallenges)
+        if (teamId) api.adminLog(token, teamId).then(setLog)
+      }
       if (ev.type === 'config_update') refetchPhase()
       if (ev.type === 'activity_log') {
         pushToast({ team_name: ev.team_name, message: ev.message, chip_delta: ev.chip_delta })
       }
     },
-    [refresh, teamId, refetchPhase, pushToast]
+    [refresh, teamId, token, refetchPhase, pushToast]
   )
   useWebSocket(getTicket, handleWsEvent)
 
@@ -100,6 +103,10 @@ export default function TeamAdminPage() {
   const challengeName = useMemo(() => {
     const byId = new Map(challenges.map((c) => [c.id, c.name]))
     return (id: number) => byId.get(id) || `任務 #${id}`
+  }, [challenges])
+  const challengeById = useMemo(() => {
+    const byId = new Map(challenges.map((c) => [c.id, c]))
+    return (id: number) => byId.get(id)
   }, [challenges])
 
   async function handleApprove(req: ApprovalRequest, body?: { success: boolean; achieved_value?: number }) {
@@ -192,6 +199,7 @@ export default function TeamAdminPage() {
                 busy={busyId === req.id}
                 stationName={stationName}
                 challengeName={challengeName}
+                challengeById={challengeById}
                 onApprove={(body) => handleApprove(req, body)}
                 onDeny={() => handleDeny(req)}
               />
@@ -227,6 +235,7 @@ function PendingCard({
   busy,
   stationName,
   challengeName,
+  challengeById,
   onApprove,
   onDeny,
 }: {
@@ -235,6 +244,7 @@ function PendingCard({
   busy: boolean
   stationName: (id: number) => string
   challengeName: (id: number) => string
+  challengeById: (id: number) => ChallengeTeaser | undefined
   onApprove: (body?: { success: boolean; achieved_value?: number }) => void
   onDeny: () => void
 }) {
@@ -247,6 +257,13 @@ function PendingCard({
         ? challengeName(req.challenge_id)
         : ''
 
+  const challenge = req.challenge_id != null ? challengeById(req.challenge_id) : undefined
+  const isVariable = challenge?.type === 'variable'
+  const unitLabel = challenge?.reward_config.unit_label || 'mini task'
+  const chipsPerUnit = Number(challenge?.reward_config.chips_per_unit) || 0
+  const achievedValid = achieved === '' || /^[1-9]\d*$/.test(achieved)
+  const achievedNum = /^[1-9]\d*$/.test(achieved) ? Number(achieved) : null
+
   return (
     <div className={`rounded-xl p-3 ${highlighted ? 'bg-amber-500/20 ring-2 ring-amber-400' : 'bg-white/5'}`}>
       <div className="flex justify-between items-baseline">
@@ -258,33 +275,47 @@ function PendingCard({
         <p className="text-sm font-bold text-amber-300">投入枚數：{req.requested_value.amount} 枚</p>
       )}
       {req.requested_value?.called_shot_value != null && (
-        <p className="text-xs text-white/50">喊出數量：{req.requested_value.called_shot_value}</p>
-      )}
-      {req.requested_value?.achieved_value != null && (
-        <p className="text-xs text-white/50">回報完成數量：{req.requested_value.achieved_value}</p>
+        <p className="text-xs text-white/50">
+          喊出數量：{req.requested_value.called_shot_value} 個「{unitLabel}」
+        </p>
       )}
 
       {req.kind === 'challenge_result' ? (
         <div className="mt-2 flex flex-col gap-2">
-          <input
-            type="number"
-            placeholder="實際完成數量（可覆蓋隊伍回報值）"
-            value={achieved}
-            disabled={busy}
-            onChange={(e) => setAchieved(e.target.value)}
-            className="bg-white/10 rounded-lg px-2 py-1.5 text-sm disabled:opacity-50"
-          />
+          {isVariable && (
+            <>
+              <input
+                type="number"
+                inputMode="numeric"
+                min={1}
+                step={1}
+                placeholder={`實際完成「${unitLabel}」數量（正整數）`}
+                value={achieved}
+                disabled={busy}
+                onChange={(e) => {
+                  const v = e.target.value
+                  if (v === '' || /^[1-9]\d*$/.test(v)) setAchieved(v)
+                }}
+                className="bg-white/10 rounded-lg px-2 py-1.5 text-sm disabled:opacity-50"
+              />
+              {achievedNum != null && chipsPerUnit > 0 && (
+                <p className="text-emerald-400 text-xs">
+                  成功可獲得 {achievedNum} × {chipsPerUnit} = {achievedNum * chipsPerUnit} 枚代幣（不含失敗加成）
+                </p>
+              )}
+            </>
+          )}
           <div className="flex gap-2">
             <button
-              disabled={busy}
-              onClick={() => onApprove({ success: true, achieved_value: achieved ? Number(achieved) : undefined })}
+              disabled={busy || !achievedValid}
+              onClick={() => onApprove({ success: true, achieved_value: achievedNum ?? undefined })}
               className="flex-1 bg-emerald-600 disabled:opacity-50 rounded-lg py-2 font-bold text-sm flex items-center justify-center gap-1.5"
             >
               {busy ? <Spinner /> : '判定成功'}
             </button>
             <button
-              disabled={busy}
-              onClick={() => onApprove({ success: false, achieved_value: achieved ? Number(achieved) : undefined })}
+              disabled={busy || !achievedValid}
+              onClick={() => onApprove({ success: false, achieved_value: achievedNum ?? undefined })}
               className="flex-1 bg-rose-600 disabled:opacity-50 rounded-lg py-2 font-bold text-sm flex items-center justify-center gap-1.5"
             >
               {busy ? <Spinner /> : '判定失敗'}

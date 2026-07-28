@@ -361,8 +361,7 @@ async def create_challenge_start_request(team_id: int, challenge_id: int, called
                 # invariants at approval time (authoritative, race-safe under FOR
                 # UPDATE) since two requests can be created before either is judged.
                 other_in_progress = await conn.fetchrow(
-                    """SELECT id FROM challenge_attempts
-                       WHERE challenge_id = $1 AND status IN ('in_progress', 'pending_result')""",
+                    "SELECT id FROM challenge_attempts WHERE challenge_id = $1 AND status = 'in_progress'",
                     challenge_id,
                 )
                 if other_in_progress is not None:
@@ -375,7 +374,7 @@ async def create_challenge_start_request(team_id: int, challenge_id: int, called
                 if other_pending_start is not None:
                     raise HTTPException(status_code=400, detail="此任務目前有其他隊伍正在申請開始，請稍後再試")
                 team_busy = await conn.fetchrow(
-                    "SELECT id FROM challenge_attempts WHERE team_id = $1 AND status IN ('in_progress', 'pending_result')",
+                    "SELECT id FROM challenge_attempts WHERE team_id = $1 AND status = 'in_progress'",
                     team_id,
                 )
                 if team_busy is not None:
@@ -428,12 +427,11 @@ async def resolve_challenge_start(request_id: int, admin_id: int, approve: bool)
                 # a clean slate here — the loser is marked stale, same as any other
                 # invalidated request.
                 other_in_progress = await conn.fetchrow(
-                    """SELECT id FROM challenge_attempts
-                       WHERE challenge_id = $1 AND status IN ('in_progress', 'pending_result')""",
+                    "SELECT id FROM challenge_attempts WHERE challenge_id = $1 AND status = 'in_progress'",
                     req["challenge_id"],
                 )
                 team_busy = await conn.fetchrow(
-                    "SELECT id FROM challenge_attempts WHERE team_id = $1 AND status IN ('in_progress', 'pending_result')",
+                    "SELECT id FROM challenge_attempts WHERE team_id = $1 AND status = 'in_progress'",
                     req["team_id"],
                 )
                 if challenge["pool_state"] != "active" or already is not None or other_in_progress is not None or team_busy is not None:
@@ -468,6 +466,18 @@ async def resolve_challenge_start(request_id: int, admin_id: int, approve: bool)
                            WHERE id = $3""",
                         admin_id, attempt["id"], request_id,
                     )
+                    # Auto-create the result-judgment request right away: the team
+                    # admin now judges success/fail directly once the task is
+                    # visibly done, with no separate player "I'm finished, send for
+                    # approval" step in between (the player's screen just shows
+                    # "任務進行中" for the whole in_progress window).
+                    await conn.execute(
+                        """INSERT INTO approval_requests
+                               (kind, team_id, challenge_id, challenge_attempt_id, requested_value, status)
+                           VALUES ('challenge_result', $1, $2, $3, $4, 'pending')""",
+                        req["team_id"], req["challenge_id"], attempt["id"],
+                        json.dumps({"called_shot_value": called_shot_value, "target_team_id": target_team_id}),
+                    )
                     start_msg = f"任務「{challenge['name']}」開始"
                     await _log(conn, req["team_id"], "admin", "challenge_start_approved",
                                challenge_id=req["challenge_id"], message=start_msg)
@@ -478,46 +488,6 @@ async def resolve_challenge_start(request_id: int, admin_id: int, approve: bool)
                         ("notify_admin", req["team_id"], "admin_pending"),
                         _activity_event(req["team_id"], team_name, "challenge_start_approved", start_msg),
                     ]
-
-    await _fire(events)
-    return result
-
-
-async def create_challenge_result_request(team_id: int, challenge_id: int, achieved_value: int | None) -> dict:
-    await assert_active_phase()
-    pool = get_pool()
-    result: dict = {}
-    events: list[tuple] = []
-
-    async with pool.acquire() as conn:
-        async with conn.transaction():
-            attempt = await conn.fetchrow(
-                "SELECT * FROM challenge_attempts WHERE challenge_id = $1 AND team_id = $2 FOR UPDATE",
-                challenge_id, team_id,
-            )
-            if attempt is None or attempt["status"] != "in_progress":
-                raise HTTPException(status_code=400, detail="此任務目前不是進行中狀態")
-
-            existing_req = await conn.fetchrow(
-                """SELECT * FROM approval_requests
-                   WHERE challenge_attempt_id = $1 AND kind = 'challenge_result' AND status = 'pending'""",
-                attempt["id"],
-            )
-            if existing_req is not None:
-                result = {"status": "pending", "request": dict(existing_req)}
-            else:
-                await conn.execute(
-                    "UPDATE challenge_attempts SET status = 'pending_result', achieved_value = $1 WHERE id = $2",
-                    achieved_value, attempt["id"],
-                )
-                req = await conn.fetchrow(
-                    """INSERT INTO approval_requests
-                           (kind, team_id, challenge_id, challenge_attempt_id, requested_value, status)
-                       VALUES ('challenge_result', $1, $2, $3, $4, 'pending') RETURNING *""",
-                    team_id, challenge_id, attempt["id"], json.dumps({"achieved_value": achieved_value}),
-                )
-                result = {"status": "pending", "request": dict(req)}
-                events = [("notify_admin", team_id, "admin_pending")]
 
     await _fire(events)
     return result
@@ -669,6 +639,15 @@ async def resolve_challenge_result(request_id: int, admin_id: int, success: bool
 MIN_ACTIVE_CHALLENGES = 3
 
 
+async def log_challenge_published(conn, challenge_id: int, name: str) -> None:
+    """A challenge going live isn't tied to any one team, so this writes a
+    single team_id=NULL row into the (otherwise all-teams-shared) action_log —
+    every team/admin/superadmin log view already reads the whole table, not a
+    per-team slice, so one row is enough for everyone to see it."""
+    await _log(conn, None, "system", "challenge_published", challenge_id=challenge_id,
+               message=f"新任務公佈：「{name}」")
+
+
 async def _refill_pool(conn) -> None:
     """Activates challenges from the queued backlog after a retirement — by the
     configured refill amount (default 2, matching the "activate 2 random new
@@ -681,12 +660,13 @@ async def _refill_pool(conn) -> None:
     slots = target - active_count
     if slots <= 0:
         return
-    candidates = await conn.fetch("SELECT id FROM challenges WHERE pool_state = 'queued'")
+    candidates = await conn.fetch("SELECT id, name FROM challenges WHERE pool_state = 'queued'")
     if not candidates:
         return
     chosen = random.sample(candidates, k=min(slots, len(candidates)))
     for row in chosen:
         await conn.execute("UPDATE challenges SET pool_state = 'active' WHERE id = $1", row["id"])
+        await log_challenge_published(conn, row["id"], row["name"])
 
 
 async def activate_initial_pool() -> None:
@@ -699,10 +679,11 @@ async def activate_initial_pool() -> None:
             target = max(cfg["challenge_pool_initial"], MIN_ACTIVE_CHALLENGES)
             slots = target - active_count
             if slots > 0:
-                candidates = await conn.fetch("SELECT id FROM challenges WHERE pool_state = 'queued'")
+                candidates = await conn.fetch("SELECT id, name FROM challenges WHERE pool_state = 'queued'")
                 chosen = random.sample(candidates, k=min(slots, len(candidates))) if candidates else []
                 for row in chosen:
                     await conn.execute("UPDATE challenges SET pool_state = 'active' WHERE id = $1", row["id"])
+                    await log_challenge_published(conn, row["id"], row["name"])
     await manager.broadcast_global("challenge_pool")
 
 
@@ -720,7 +701,7 @@ async def sweep_expired_attempts() -> None:
     async with pool.acquire() as conn:
         async with conn.transaction():
             stuck = await conn.fetch(
-                "SELECT * FROM challenge_attempts WHERE status IN ('in_progress', 'pending_result') FOR UPDATE"
+                "SELECT * FROM challenge_attempts WHERE status = 'in_progress' FOR UPDATE"
             )
             for a in stuck:
                 touched = True

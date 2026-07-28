@@ -63,11 +63,6 @@ export const api = {
   getPublicConfig: () => req<{ starting_chips: number; max_deposit_per_visit: number; fail_bonus_step_pct: number }>('/config/public'),
   challengeStart: (token: string, challengeId: number, body: { called_shot_value?: number; target_team_id?: number }) =>
     req<any>(`/team/${token}/challenge/${challengeId}/start`, { method: 'POST', body: JSON.stringify(body) }),
-  challengeSubmitResult: (token: string, challengeId: number, achieved_value?: number) =>
-    req<any>(`/team/${token}/challenge/${challengeId}/submit-result`, {
-      method: 'POST',
-      body: JSON.stringify({ achieved_value }),
-    }),
   myAttempts: (token: string) => req<ChallengeAttempt[]>(`/team/${token}/my-attempts`),
   challengeDetail: (token: string, challengeId: number) => req<Challenge>(`/team/${token}/challenge/${challengeId}`),
   gpsPing: (token: string, device_id: string, lat: number, lng: number) =>

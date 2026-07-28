@@ -7,6 +7,9 @@ const TYPE_LABELS: Record<string, string> = {
   variable: '猜拳式獎勵（需先喊出目標數量）',
 }
 
+/** Positive-integer-only text (mini task counts are never fractional or negative). Empty string is allowed while typing/clearing. */
+const isPositiveIntInput = (v: string) => v === '' || /^[1-9]\d*$/.test(v)
+
 interface Props {
   teaser: ChallengeTeaser
   attempt: ChallengeAttempt | undefined
@@ -16,7 +19,6 @@ interface Props {
   hasPendingRequest: boolean
   onClose: () => void
   onStart: (body: { called_shot_value?: number; target_team_id?: number }) => Promise<void>
-  onSubmitResult: (achievedValue?: number) => Promise<void>
 }
 
 export default function ChallengeModal({
@@ -28,11 +30,9 @@ export default function ChallengeModal({
   hasPendingRequest,
   onClose,
   onStart,
-  onSubmitResult,
 }: Props) {
   const [calledShot, setCalledShot] = useState('')
   const [targetTeamId, setTargetTeamId] = useState<number | ''>('')
-  const [achieved, setAchieved] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
@@ -41,27 +41,18 @@ export default function ChallengeModal({
   }, [teaser.id])
 
   const otherTeams = teams.filter((t) => t.id !== myTeamId && t.active)
+  const chipsPerUnit = Number(teaser.reward_config.chips_per_unit) || 0
+  const unitLabel = teaser.reward_config.unit_label || 'mini task'
+  const calledShotValue = /^[1-9]\d*$/.test(calledShot) ? Number(calledShot) : null
 
   async function handleStart() {
     setBusy(true)
     setError('')
     try {
       await onStart({
-        called_shot_value: calledShot ? Number(calledShot) : undefined,
+        called_shot_value: calledShotValue ?? undefined,
         target_team_id: targetTeamId === '' ? undefined : Number(targetTeamId),
       })
-    } catch (e: any) {
-      setError(e.message || '操作失敗')
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  async function handleSubmitResult() {
-    setBusy(true)
-    setError('')
-    try {
-      await onSubmitResult(achieved ? Number(achieved) : undefined)
     } catch (e: any) {
       setError(e.message || '操作失敗')
     } finally {
@@ -99,13 +90,23 @@ export default function ChallengeModal({
           <div className="mt-4 flex flex-col gap-3">
             {teaser.type === 'variable' && (
               <label className="text-sm">
-                喊出目標數量（Call your shot）
+                喊出目標數量 —— 欲挑戰的「{unitLabel}」數量（非代幣數量），須為正整數
                 <input
                   type="number"
+                  inputMode="numeric"
+                  min={1}
+                  step={1}
                   value={calledShot}
-                  onChange={(e) => setCalledShot(e.target.value)}
+                  onChange={(e) => {
+                    if (isPositiveIntInput(e.target.value)) setCalledShot(e.target.value)
+                  }}
                   className="mt-1 w-full bg-white/10 rounded-lg px-3 py-2"
                 />
+                {calledShotValue != null && chipsPerUnit > 0 && (
+                  <p className="mt-1 text-emerald-400 text-xs">
+                    成功可獲得 {calledShotValue} × {chipsPerUnit} = {calledShotValue * chipsPerUnit} 枚代幣（不含失敗加成）
+                  </p>
+                )}
               </label>
             )}
             {teaser.type === 'steal' && (
@@ -126,7 +127,11 @@ export default function ChallengeModal({
               </label>
             )}
             <button
-              disabled={busy || (teaser.type === 'steal' && targetTeamId === '')}
+              disabled={
+                busy ||
+                (teaser.type === 'steal' && targetTeamId === '') ||
+                (teaser.type === 'variable' && calledShot !== '' && calledShotValue === null)
+              }
               onClick={handleStart}
               className="bg-purple-600 disabled:opacity-40 font-bold rounded-xl py-3"
             >
@@ -144,25 +149,8 @@ export default function ChallengeModal({
             <div className="bg-white/5 rounded-xl p-3 text-sm whitespace-pre-wrap">
               {fullDetail ? fullDetail.description : '任務內容載入中…'}
             </div>
-            {teaser.type === 'variable' && (
-              <label className="text-sm">
-                實際完成數量
-                <input
-                  type="number"
-                  value={achieved}
-                  onChange={(e) => setAchieved(e.target.value)}
-                  className="mt-1 w-full bg-white/10 rounded-lg px-3 py-2"
-                />
-              </label>
-            )}
-            <button disabled={busy} onClick={handleSubmitResult} className="bg-emerald-600 disabled:opacity-40 font-bold rounded-xl py-3">
-              完成挑戰，送交管理員判定
-            </button>
+            <p className="text-amber-300 font-bold text-center py-2">🚀 任務進行中，請等待隨隊管理員判定成功或失敗</p>
           </div>
-        )}
-
-        {attempt && attempt.status === 'pending_result' && (
-          <p className="mt-4 text-amber-300 font-medium">⏳ 等待隨隊管理員判定結果…</p>
         )}
 
         {attempt && (attempt.status === 'success' || attempt.status === 'failed') && (
@@ -186,7 +174,7 @@ function RewardSummary({ teaser }: { teaser: ChallengeTeaser }) {
   if (teaser.type === 'variable')
     return (
       <p className="text-sm">
-        獎勵：每個{rc.unit_label || '單位'} {rc.chips_per_unit} 枚代幣（須達成喊出的數量才算成功）
+        獎勵：每完成 1 個「{rc.unit_label || 'mini task'}」可得 {rc.chips_per_unit} 枚代幣（需達成喊出的數量才算成功；獲得代幣數 = 完成數量 × {rc.chips_per_unit}）
       </p>
     )
   if (teaser.type === 'steal') return <p className="text-sm">獎勵：偷取目標隊伍 {rc.steal_pct}% 的代幣</p>

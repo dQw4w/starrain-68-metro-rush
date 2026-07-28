@@ -1,7 +1,7 @@
 from datetime import date, datetime, time
 from typing import Any, Literal, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, PositiveInt
 
 
 # ---------------------------------------------------------------------------
@@ -219,7 +219,7 @@ class ApprovalRequestOut(BaseModel):
 
 class ResolveChallengeResultBody(BaseModel):
     success: bool
-    achieved_value: Optional[int] = None
+    achieved_value: Optional[PositiveInt] = None
 
 
 class DenyRequestBody(BaseModel):
@@ -312,7 +312,7 @@ class ChallengeAttempt(BaseModel):
     id: int
     challenge_id: int
     team_id: int
-    status: Literal["pending_start_approval", "in_progress", "pending_result", "success", "failed"]
+    status: Literal["pending_start_approval", "in_progress", "success", "failed"]
     called_shot_value: Optional[int]
     achieved_value: Optional[int]
     target_team_id: Optional[int]
@@ -323,13 +323,9 @@ class ChallengeAttempt(BaseModel):
 
 
 class ChallengeStartRequest(BaseModel):
-    called_shot_value: Optional[int] = None
+    called_shot_value: Optional[PositiveInt] = None
     target_team_id: Optional[int] = None
     requested_by: Optional[str] = None
-
-
-class ChallengeSubmitResultRequest(BaseModel):
-    achieved_value: Optional[int] = None
 
 
 # ---------------------------------------------------------------------------
@@ -338,8 +334,8 @@ class ChallengeSubmitResultRequest(BaseModel):
 
 class ActionLogEntry(BaseModel):
     id: int
-    team_id: int
-    team_name: str
+    team_id: Optional[int]
+    team_name: Optional[str]
     actor: str
     action_type: str
     station_id: Optional[int]

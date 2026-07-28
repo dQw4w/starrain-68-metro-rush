@@ -6,7 +6,6 @@ from auth import mint_ws_ticket
 from db import get_pool
 from game_logic import (
     create_action_request,
-    create_challenge_result_request,
     create_challenge_start_request,
     get_pending_for_team,
     get_phase,
@@ -16,7 +15,6 @@ from models import (
     ActionLogEntry,
     ApprovalRequestOut,
     ChallengeStartRequest,
-    ChallengeSubmitResultRequest,
     ClaimRequestCreate,
     DevicePosition,
     GamePhase,
@@ -78,13 +76,13 @@ async def team_log(token: str, action_type: str | None = Query(default=None), li
     pool = get_pool()
     if action_type:
         rows = await pool.fetch(
-            """SELECT al.*, t.name AS team_name FROM action_log al JOIN teams t ON t.id = al.team_id
+            """SELECT al.*, t.name AS team_name FROM action_log al LEFT JOIN teams t ON t.id = al.team_id
                WHERE al.action_type = $1 ORDER BY al.created_at DESC LIMIT $2""",
             action_type, limit,
         )
     else:
         rows = await pool.fetch(
-            """SELECT al.*, t.name AS team_name FROM action_log al JOIN teams t ON t.id = al.team_id
+            """SELECT al.*, t.name AS team_name FROM action_log al LEFT JOIN teams t ON t.id = al.team_id
                ORDER BY al.created_at DESC LIMIT $1""",
             limit,
         )
@@ -103,12 +101,6 @@ async def challenge_start(token: str, challenge_id: int, body: ChallengeStartReq
     return await create_challenge_start_request(
         team["id"], challenge_id, body.called_shot_value, body.target_team_id, body.requested_by
     )
-
-
-@router.post("/challenge/{challenge_id}/submit-result", response_model=dict)
-async def challenge_submit_result(token: str, challenge_id: int, body: ChallengeSubmitResultRequest):
-    team = await _team_by_token(token)
-    return await create_challenge_result_request(team["id"], challenge_id, body.achieved_value)
 
 
 @router.get("/my-attempts")

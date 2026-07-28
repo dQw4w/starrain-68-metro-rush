@@ -2,7 +2,7 @@ export type ChallengeType = 'fixed' | 'variable' | 'steal' | 'multiplier'
 export type PoolState = 'queued' | 'active' | 'retired'
 export type RequestKind = 'claim' | 'topup' | 'challenge_start' | 'challenge_result'
 export type RequestStatus = 'pending' | 'approved' | 'denied' | 'stale'
-export type AttemptStatus = 'pending_start_approval' | 'in_progress' | 'pending_result' | 'success' | 'failed'
+export type AttemptStatus = 'pending_start_approval' | 'in_progress' | 'success' | 'failed'
 export type GamePhaseName = 'not_started' | 'active' | 'lunch_break' | 'ended' | 'paused'
 
 export interface Line {
@@ -150,8 +150,9 @@ export interface ChallengeAttempt {
 
 export interface ActionLogEntry {
   id: number
-  team_id: number
-  team_name: string
+  /** null for global events not tied to any one team (e.g. a new challenge going live). */
+  team_id: number | null
+  team_name: string | null
   actor: string
   action_type: string
   station_id: number | null

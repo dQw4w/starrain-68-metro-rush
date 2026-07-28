@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from auth import AdminIdentity, require_superadmin
 from db import get_pool
 from models import Challenge, ChallengeCreate, ChallengeTeaser, ChallengeUpdate
-from game_logic import activate_initial_pool
+from game_logic import activate_initial_pool, log_challenge_published
 from ws import manager
 
 router = APIRouter(tags=["challenges"])
@@ -66,6 +66,7 @@ async def create_challenge(body: ChallengeCreate, _: AdminIdentity = Depends(req
     )
     if body.pool_state == "active":
         await manager.broadcast_global("challenge_pool")
+        await log_challenge_published(pool, row["id"], row["name"])
     return _to_challenge(row)
 
 
@@ -77,7 +78,9 @@ async def update_challenge(challenge_id: int, body: ChallengeUpdate, _: AdminIde
         fields["reward_config"] = json.dumps(fields["reward_config"])
     if not fields:
         row = await pool.fetchrow("SELECT * FROM challenges WHERE id = $1", challenge_id)
+        prev_pool_state = row["pool_state"] if row else None
     else:
+        prev_pool_state = await pool.fetchval("SELECT pool_state FROM challenges WHERE id = $1", challenge_id)
         set_clause = ", ".join(f"{k} = ${i + 1}" for i, k in enumerate(fields))
         values = list(fields.values())
         row = await pool.fetchrow(
@@ -87,6 +90,8 @@ async def update_challenge(challenge_id: int, body: ChallengeUpdate, _: AdminIde
     if row is None:
         raise HTTPException(status_code=404, detail="找不到此任務")
     await manager.broadcast_global("challenge_pool")
+    if fields.get("pool_state") == "active" and prev_pool_state != "active":
+        await log_challenge_published(pool, row["id"], row["name"])
     return _to_challenge(row)
 
 

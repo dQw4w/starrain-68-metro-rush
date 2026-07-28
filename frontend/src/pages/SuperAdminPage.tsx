@@ -395,20 +395,20 @@ function TeamProgressPanel({
   onError: (m: string) => void
 }) {
   const [balance, setBalance] = useState(String(team.chips_balance))
-  const [busy, setBusy] = useState(false)
+  const [busyKey, setBusyKey] = useState<string | null>(null)
   const owned = claims.filter((c) => c.owner_team_id === team.id)
   const stationName = (id: number) => stations.find((s) => s.id === id)?.name_zh || `車站 #${id}`
 
-  async function run(fn: () => Promise<unknown>, confirmMsg?: string) {
+  async function run(key: string, fn: () => Promise<unknown>, confirmMsg?: string) {
     if (confirmMsg && !window.confirm(confirmMsg)) return
-    setBusy(true)
+    setBusyKey(key)
     try {
       await fn()
       onChanged()
     } catch (e: any) {
       onError(e.message || '操作失敗')
     } finally {
-      setBusy(false)
+      setBusyKey(null)
     }
   }
 
@@ -421,16 +421,16 @@ function TeamProgressPanel({
         <input
           type="number"
           value={balance}
-          disabled={busy}
+          disabled={busyKey !== null}
           onChange={(e) => setBalance(e.target.value)}
           className="w-24 bg-white/10 rounded-lg px-2 py-1.5 text-sm disabled:opacity-50"
         />
         <button
-          disabled={busy}
-          onClick={() => run(() => api.setTeamBalance(token, team.id, Number(balance)))}
-          className="bg-blue-600 disabled:opacity-40 rounded-lg px-3 py-1.5 text-xs font-bold"
+          disabled={busyKey !== null}
+          onClick={() => run('balance', () => api.setTeamBalance(token, team.id, Number(balance)))}
+          className="bg-blue-600 disabled:opacity-40 rounded-lg px-3 py-1.5 text-xs font-bold flex items-center justify-center"
         >
-          設定
+          {busyKey === 'balance' ? <Spinner /> : '設定'}
         </button>
       </div>
 
@@ -445,11 +445,11 @@ function TeamProgressPanel({
                   {stationName(c.station_id)}（{c.value}/{c.cap}）
                 </span>
                 <button
-                  disabled={busy}
-                  onClick={() => run(() => api.releaseStations(token, team.id, [c.station_id]))}
-                  className="text-rose-400 disabled:opacity-40 shrink-0"
+                  disabled={busyKey !== null}
+                  onClick={() => run(`release-${c.station_id}`, () => api.releaseStations(token, team.id, [c.station_id]))}
+                  className="text-rose-400 disabled:opacity-40 shrink-0 flex items-center justify-center"
                 >
-                  釋出
+                  {busyKey === `release-${c.station_id}` ? <Spinner /> : '釋出'}
                 </button>
               </div>
             ))}
@@ -457,29 +457,34 @@ function TeamProgressPanel({
         )}
         {owned.length > 0 && (
           <button
-            disabled={busy}
-            onClick={() => run(() => api.releaseStations(token, team.id, null), `確定要釋出「${team.name}」所有車站嗎？`)}
-            className="mt-2 bg-white/10 disabled:opacity-40 rounded-lg px-3 py-1.5 text-xs font-bold"
+            disabled={busyKey !== null}
+            onClick={() => run('releaseAll', () => api.releaseStations(token, team.id, null), `確定要釋出「${team.name}」所有車站嗎？`)}
+            className="mt-2 bg-white/10 disabled:opacity-40 rounded-lg px-3 py-1.5 text-xs font-bold flex items-center justify-center"
           >
-            釋出全部車站
+            {busyKey === 'releaseAll' ? <Spinner /> : '釋出全部車站'}
           </button>
         )}
       </div>
 
       <button
-        disabled={busy}
+        disabled={busyKey !== null}
         onClick={() =>
           run(
+            'reset',
             () => api.resetTeam(token, team.id),
             `確定要重置「${team.name}」的所有進度嗎？（代幣、車站、任務紀錄、日誌全部清空重來，此動作無法復原）`
           )
         }
-        className="bg-rose-600 disabled:opacity-40 rounded-lg py-2 font-bold text-sm"
+        className="bg-rose-600 disabled:opacity-40 rounded-lg py-2 font-bold text-sm flex items-center justify-center"
       >
-        重置此隊伍所有進度
+        {busyKey === 'reset' ? <Spinner /> : '重置此隊伍所有進度'}
       </button>
     </div>
   )
+}
+
+function Spinner() {
+  return <span className="inline-block w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
 }
 
 function TeamEditForm({

@@ -95,7 +95,10 @@ export default function TeamPage() {
         refreshLog()
         refreshAttempts()
       }
-      if (ev.type === 'challenge_pool') refreshChallenges()
+      if (ev.type === 'challenge_pool') {
+        refreshChallenges()
+        refreshLog()
+      }
       if (ev.type === 'gps_update') refreshGps()
       if (ev.type === 'config_update') {
         refreshState()
@@ -169,13 +172,6 @@ export default function TeamPage() {
     if (!token || !selectedChallenge) return
     await api.challengeStart(token, selectedChallenge.id, body)
     await refreshState()
-  }
-
-  async function submitChallengeResult(achievedValue?: number) {
-    if (!token || !selectedChallenge) return
-    await api.challengeSubmitResult(token, selectedChallenge.id, achievedValue)
-    await refreshState()
-    await refreshAttempts()
   }
 
   return (
@@ -260,7 +256,6 @@ export default function TeamPage() {
           hasPendingRequest={!!pendingChallengeRequest}
           onClose={() => setSelectedChallenge(null)}
           onStart={submitChallengeStart}
-          onSubmitResult={submitChallengeResult}
         />
       )}
     </div>
@@ -337,7 +332,6 @@ function StatusBadge({ attempt }: { attempt: ChallengeAttempt | undefined }) {
   if (!attempt) return <span className="text-white/40 text-xs">尚未嘗試</span>
   const labels: Record<string, string> = {
     in_progress: '進行中',
-    pending_result: '待判定',
     success: '成功',
     failed: '失敗',
     pending_start_approval: '待核准',
@@ -346,7 +340,6 @@ function StatusBadge({ attempt }: { attempt: ChallengeAttempt | undefined }) {
     success: 'text-emerald-400',
     failed: 'text-rose-400',
     in_progress: 'text-amber-300',
-    pending_result: 'text-amber-300',
   }
   return <span className={`text-xs ${colors[attempt.status] || 'text-white/50'}`}>{labels[attempt.status]}</span>
 }

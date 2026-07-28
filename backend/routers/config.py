@@ -219,7 +219,7 @@ async def overview(_: AdminIdentity = Depends(require_superadmin)):
 async def global_log(_: AdminIdentity = Depends(require_superadmin), limit: int = 500):
     pool = get_pool()
     rows = await pool.fetch(
-        """SELECT al.*, t.name AS team_name FROM action_log al JOIN teams t ON t.id = al.team_id
+        """SELECT al.*, t.name AS team_name FROM action_log al LEFT JOIN teams t ON t.id = al.team_id
            ORDER BY al.created_at DESC LIMIT $1""",
         limit,
     )
