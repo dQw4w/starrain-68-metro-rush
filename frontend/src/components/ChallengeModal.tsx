@@ -90,7 +90,7 @@ export default function ChallengeModal({
           <div className="mt-4 flex flex-col gap-3">
             {teaser.type === 'variable' && (
               <label className="text-sm">
-                喊出目標數量 —— 欲挑戰的「{unitLabel}」數量（非代幣數量），須為正整數
+                喊出目標數量（必填）—— 欲挑戰的「{unitLabel}」數量（非代幣數量），須為正整數
                 <input
                   type="number"
                   inputMode="numeric"
@@ -130,7 +130,7 @@ export default function ChallengeModal({
               disabled={
                 busy ||
                 (teaser.type === 'steal' && targetTeamId === '') ||
-                (teaser.type === 'variable' && calledShot !== '' && calledShotValue === null)
+                (teaser.type === 'variable' && calledShotValue === null)
               }
               onClick={handleStart}
               className="bg-purple-600 disabled:opacity-40 font-bold rounded-xl py-3"

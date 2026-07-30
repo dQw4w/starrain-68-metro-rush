@@ -75,7 +75,7 @@ export const api = {
     req<TeamPublic>(`/admin/team/${teamId}/info`, { headers: authHeaders(token) }),
   adminPending: (token: string, teamId: number) =>
     req<ApprovalRequest[]>(`/admin/team/${teamId}/pending`, { headers: authHeaders(token) }),
-  adminApprove: (token: string, teamId: number, requestId: number, body?: { success: boolean; achieved_value?: number }) =>
+  adminApprove: (token: string, teamId: number, requestId: number, body?: { success: boolean }) =>
     req<any>(`/admin/team/${teamId}/approve/${requestId}`, {
       method: 'POST',
       headers: authHeaders(token),

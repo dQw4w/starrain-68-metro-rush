@@ -352,6 +352,11 @@ async def create_challenge_start_request(team_id: int, challenge_id: int, called
                     raise HTTPException(status_code=400, detail="此任務貴隊已經嘗試過了")
                 if challenge["type"] == "steal" and target_team_id is None:
                     raise HTTPException(status_code=400, detail="偷竊任務需指定目標隊伍")
+                if challenge["type"] == "variable" and called_shot_value is None:
+                    # The called number is now the sole reward driver (see
+                    # resolve_challenge_result) — without one, success would
+                    # always pay out 0, so it's required up front.
+                    raise HTTPException(status_code=400, detail="此任務需先喊出目標數量（Call Your Shot）")
 
                 # Exclusivity: one challenge is worked on by at most one team at a
                 # time (freed up again if that team fails — a success takes the
@@ -493,7 +498,7 @@ async def resolve_challenge_start(request_id: int, admin_id: int, approve: bool)
     return result
 
 
-def _compute_reward(challenge_type: str, reward_config: dict, called_shot_value: int | None,
+def _compute_reward(challenge_type: str, reward_config: dict,
                      achieved_value: int | None, fail_bonus_pct: float, target_balance: int | None) -> tuple[int, int | None]:
     """Returns (reward_amount, steal_amount_or_None). Positive reward is always
     credited to the acting team; steal_amount (if not None) is also debited
@@ -504,10 +509,11 @@ def _compute_reward(challenge_type: str, reward_config: dict, called_shot_value:
         return round(reward_config.get("chips", 0) * bonus_mult), None
 
     if challenge_type == "variable":
+        # achieved_value is always the team's called shot by this point (see
+        # resolve_challenge_result) — success already means "hit the number
+        # called", so there's no separate threshold check left to do here.
         per_unit = reward_config.get("chips_per_unit", 0)
         achieved = achieved_value or 0
-        if called_shot_value is not None and achieved < called_shot_value:
-            return 0, None
         return round(achieved * per_unit * bonus_mult), None
 
     if challenge_type == "multiplier":
@@ -523,7 +529,7 @@ def _compute_reward(challenge_type: str, reward_config: dict, called_shot_value:
     return 0, None
 
 
-async def resolve_challenge_result(request_id: int, admin_id: int, success: bool, achieved_value: int | None) -> dict:
+async def resolve_challenge_result(request_id: int, admin_id: int, success: bool) -> dict:
     pool = get_pool()
     result: dict = {}
     events: list[tuple] = []
@@ -544,7 +550,11 @@ async def resolve_challenge_result(request_id: int, admin_id: int, success: bool
             challenge = await conn.fetchrow("SELECT * FROM challenges WHERE id = $1", attempt["challenge_id"])
             team = await conn.fetchrow("SELECT * FROM teams WHERE id = $1 FOR UPDATE", attempt["team_id"])
 
-            final_achieved = achieved_value if achieved_value is not None else attempt["achieved_value"]
+            # Admins no longer report a separate "actual completed" count — for
+            # a call-your-shot (variable) challenge, success/fail is simply
+            # whether the team's own called shot happened, so the reward is
+            # driven directly by what the player called at start time.
+            final_achieved = attempt["called_shot_value"] if challenge["type"] == "variable" else attempt["achieved_value"]
             reward_config = challenge["reward_config"]
             if isinstance(reward_config, str):
                 reward_config = json.loads(reward_config)
@@ -562,7 +572,7 @@ async def resolve_challenge_result(request_id: int, admin_id: int, success: bool
                     target_row["chips_balance"] if target_row else None
                 )
                 reward_amount, steal_amount = _compute_reward(
-                    challenge["type"], reward_config, attempt["called_shot_value"],
+                    challenge["type"], reward_config,
                     final_achieved, float(attempt["fail_bonus_pct_locked"]), base_balance,
                 )
 

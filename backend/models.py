@@ -219,7 +219,6 @@ class ApprovalRequestOut(BaseModel):
 
 class ResolveChallengeResultBody(BaseModel):
     success: bool
-    achieved_value: Optional[PositiveInt] = None
 
 
 class DenyRequestBody(BaseModel):

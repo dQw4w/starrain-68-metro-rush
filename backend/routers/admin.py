@@ -73,8 +73,8 @@ async def approve_request(
         return await resolve_challenge_start(request_id, admin.admin_id, approve=True)
     if kind == "challenge_result":
         if body is None:
-            raise HTTPException(status_code=400, detail="需提供 success / achieved_value")
-        return await resolve_challenge_result(request_id, admin.admin_id, body.success, body.achieved_value)
+            raise HTTPException(status_code=400, detail="需提供 success")
+        return await resolve_challenge_result(request_id, admin.admin_id, body.success)
     raise HTTPException(status_code=400, detail="未知的請求類型")
 
 
