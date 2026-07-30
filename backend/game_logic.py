@@ -670,7 +670,12 @@ async def _refill_pool(conn) -> None:
 
 
 async def activate_initial_pool() -> None:
-    """Called by superadmin when kicking off the challenge pool for the first time."""
+    """Called by superadmin when kicking off the challenge pool for the first
+    time (and again by a full game reset). The initial reveal is always
+    fixed-reward challenges only — no variable/steal/multiplier — so new
+    teams aren't hit with a "call your shot" or steal mechanic before they've
+    even seen a normal challenge; later refills (see _refill_pool) draw from
+    every type."""
     pool = get_pool()
     async with pool.acquire() as conn:
         async with conn.transaction():
@@ -679,7 +684,9 @@ async def activate_initial_pool() -> None:
             target = max(cfg["challenge_pool_initial"], MIN_ACTIVE_CHALLENGES)
             slots = target - active_count
             if slots > 0:
-                candidates = await conn.fetch("SELECT id, name FROM challenges WHERE pool_state = 'queued'")
+                candidates = await conn.fetch(
+                    "SELECT id, name FROM challenges WHERE pool_state = 'queued' AND type = 'fixed'"
+                )
                 chosen = random.sample(candidates, k=min(slots, len(candidates))) if candidates else []
                 for row in chosen:
                     await conn.execute("UPDATE challenges SET pool_state = 'active' WHERE id = $1", row["id"])
