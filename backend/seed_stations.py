@@ -158,6 +158,7 @@ _COORD_OVERRIDES: dict[str, tuple[float, float]] = {
     "台北小巨蛋": (25.051673, 121.551506),
     "小碧潭": (24.971734, 121.530590),
     "大坪林": (24.982922, 121.541324),
+    "廣慈/奉天宮": (25.037355, 121.582046),
 }
 
 _COORDS = {**_REAL_COORDS, **_Y_LINE_COORDS, **_COORD_OVERRIDES}
