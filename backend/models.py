@@ -264,6 +264,11 @@ class Challenge(BaseModel):
     lng: Optional[float]
     image_url: Optional[str]
     pool_state: Literal["queued", "active", "retired"]
+    # How many teams have already failed this challenge — drives the fail
+    # bonus (see resolve_challenge_start's fail_bonus_pct calculation).
+    # Defaults to 0 for read paths that don't join challenge_attempts (e.g.
+    # the superadmin CRUD list), where it's not meaningful to show anyway.
+    prior_fail_count: int = 0
 
 
 class ChallengeTeaser(BaseModel):
@@ -279,6 +284,7 @@ class ChallengeTeaser(BaseModel):
     lng: Optional[float]
     image_url: Optional[str]
     pool_state: Literal["queued", "active", "retired"]
+    prior_fail_count: int = 0
 
 
 class ChallengeCreate(BaseModel):

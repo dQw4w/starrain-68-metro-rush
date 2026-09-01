@@ -129,6 +129,8 @@ export interface Challenge {
   lng: number | null
   image_url: string | null
   pool_state: PoolState
+  /** How many teams have already failed this challenge — drives the fail bonus. */
+  prior_fail_count: number
 }
 
 /** Public listing shape: no `inner_title`/`description` — hidden until a team's admin approves the start. */

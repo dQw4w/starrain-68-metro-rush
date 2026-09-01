@@ -265,8 +265,8 @@ function PendingCard({
   const chipsPerUnit = Number(challenge?.reward_config.chips_per_unit) || 0
   const calledShotValue: number | null = req.requested_value?.called_shot_value ?? null
 
-  function approve(body?: { success: boolean }) {
-    setClicked('primary')
+  function approve(clickedKey: 'primary' | 'secondary', body?: { success: boolean }) {
+    setClicked(clickedKey)
     onApprove(body)
   }
   function deny() {
@@ -297,14 +297,14 @@ function PendingCard({
         <div className="mt-2 flex gap-2">
           <button
             disabled={busy}
-            onClick={() => approve({ success: true })}
+            onClick={() => approve('primary', { success: true })}
             className="flex-1 bg-emerald-600 disabled:opacity-50 rounded-lg py-2 font-bold text-sm flex items-center justify-center gap-1.5"
           >
             {busy && clicked === 'primary' ? <Spinner /> : '判定成功'}
           </button>
           <button
             disabled={busy}
-            onClick={() => approve({ success: false })}
+            onClick={() => approve('secondary', { success: false })}
             className="flex-1 bg-rose-600 disabled:opacity-50 rounded-lg py-2 font-bold text-sm flex items-center justify-center gap-1.5"
           >
             {busy && clicked === 'secondary' ? <Spinner /> : '判定失敗'}
@@ -314,7 +314,7 @@ function PendingCard({
         <div className="mt-2 flex gap-2">
           <button
             disabled={busy}
-            onClick={() => approve()}
+            onClick={() => approve('primary')}
             className="flex-1 bg-emerald-600 disabled:opacity-50 rounded-lg py-2 font-bold text-sm flex items-center justify-center gap-1.5"
           >
             {busy && clicked === 'primary' ? <Spinner /> : '核准'}

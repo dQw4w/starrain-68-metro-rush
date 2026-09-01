@@ -37,6 +37,7 @@ export default function TeamPage() {
   const [selectedChallenge, setSelectedChallenge] = useState<ChallengeTeaser | null>(null)
   const [challengeDetail, setChallengeDetail] = useState<Challenge | null>(null)
   const [maxDepositPerVisit, setMaxDepositPerVisit] = useState(5)
+  const [failBonusStepPct, setFailBonusStepPct] = useState(25)
   const { toasts, push: pushToast } = useToastQueue()
 
   const refreshState = useCallback(async () => {
@@ -48,6 +49,7 @@ export default function TeamPage() {
   const refreshConfig = useCallback(async () => {
     const cfg = await api.getPublicConfig()
     setMaxDepositPerVisit(cfg.max_deposit_per_visit)
+    setFailBonusStepPct(cfg.fail_bonus_step_pct)
   }, [])
   const refreshLog = useCallback(async () => {
     if (token) setLog(await api.teamLog(token))
@@ -210,6 +212,7 @@ export default function TeamPage() {
           mapData={mapData}
           teams={state.ranking}
           challenges={challenges}
+          failBonusStepPct={failBonusStepPct}
           gps={gps}
           onStationClick={setSelectedStation}
           onChallengeClick={setSelectedChallenge}
@@ -254,6 +257,7 @@ export default function TeamPage() {
           teams={state.ranking}
           myTeamId={myTeam.id}
           hasPendingRequest={!!pendingChallengeRequest}
+          failBonusStepPct={failBonusStepPct}
           onClose={() => setSelectedChallenge(null)}
           onStart={submitChallengeStart}
         />

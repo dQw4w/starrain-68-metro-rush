@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { CHALLENGE_TYPE_LABELS, ChallengeIconBadge } from './ChallengeIcon'
+import { CHALLENGE_TYPE_LABELS, ChallengeIconBadge, failBonusPct } from './ChallengeIcon'
 import type { Challenge, ChallengeAttempt, ChallengeTeaser, TeamPublic } from '../types'
 
 const TYPE_LABELS: Record<string, string> = {
@@ -17,6 +17,8 @@ interface Props {
   teams: TeamPublic[]
   myTeamId: number
   hasPendingRequest: boolean
+  /** % reward bonus per prior team that failed this challenge. */
+  failBonusStepPct: number
   onClose: () => void
   onStart: (body: { called_shot_value?: number; target_team_id?: number }) => Promise<void>
 }
@@ -28,6 +30,7 @@ export default function ChallengeModal({
   teams,
   myTeamId,
   hasPendingRequest,
+  failBonusStepPct,
   onClose,
   onStart,
 }: Props) {
@@ -44,6 +47,7 @@ export default function ChallengeModal({
   const chipsPerUnit = Number(teaser.reward_config.chips_per_unit) || 0
   const unitLabel = teaser.reward_config.unit_label || 'mini task'
   const calledShotValue = /^[1-9]\d*$/.test(calledShot) ? Number(calledShot) : null
+  const bonusPct = failBonusPct(teaser, failBonusStepPct)
 
   async function handleStart() {
     setBusy(true)
@@ -82,7 +86,12 @@ export default function ChallengeModal({
         </div>
         <p className="text-sm text-purple-300 mb-1">{TYPE_LABELS[teaser.type]}</p>
         {teaser.location_name && <p className="text-sm text-white/60 mb-3">📍 {teaser.location_name}</p>}
-        <RewardSummary teaser={teaser} />
+        {teaser.prior_fail_count > 0 && (
+          <p className="text-sm font-bold text-rose-400 bg-rose-500/10 rounded-lg px-3 py-2 mb-3">
+            🔥 已有 {teaser.prior_fail_count} 隊挑戰失敗，本次挑戰獎勵加成 +{bonusPct}%
+          </p>
+        )}
+        <RewardSummary teaser={teaser} bonusPct={bonusPct} />
 
         {error && <p className="text-rose-400 text-sm mt-3">{error}</p>}
 
@@ -104,7 +113,8 @@ export default function ChallengeModal({
                 />
                 {calledShotValue != null && chipsPerUnit > 0 && (
                   <p className="mt-1 text-emerald-400 text-xs">
-                    成功可獲得 {calledShotValue} × {chipsPerUnit} = {calledShotValue * chipsPerUnit} 枚代幣（不含失敗加成）
+                    成功可獲得 {calledShotValue} × {chipsPerUnit} = {calledShotValue * chipsPerUnit} 枚代幣
+                    {bonusPct > 0 && `（含 +${bonusPct}% 加成後為 ${Math.round(calledShotValue * chipsPerUnit * (1 + bonusPct / 100))}）`}
                   </p>
                 )}
               </label>
@@ -168,16 +178,18 @@ export default function ChallengeModal({
   )
 }
 
-function RewardSummary({ teaser }: { teaser: ChallengeTeaser }) {
+function RewardSummary({ teaser, bonusPct }: { teaser: ChallengeTeaser; bonusPct: number }) {
   const rc = teaser.reward_config
-  if (teaser.type === 'fixed') return <p className="text-sm">獎勵：{rc.chips} 枚代幣</p>
+  const bonusNote = (base: number) => (bonusPct > 0 ? `（含 +${bonusPct}% 加成後為 ${Math.round(base * (1 + bonusPct / 100))}）` : '')
+  if (teaser.type === 'fixed') return <p className="text-sm">獎勵：{rc.chips} 枚代幣{bonusNote(Number(rc.chips) || 0)}</p>
   if (teaser.type === 'variable')
     return (
       <p className="text-sm">
-        獎勵：每完成 1 個「{rc.unit_label || 'mini task'}」可得 {rc.chips_per_unit} 枚代幣（需達成喊出的數量才算成功；獲得代幣數 = 完成數量 × {rc.chips_per_unit}）
+        獎勵：每完成 1 個「{rc.unit_label || 'mini task'}」可得 {rc.chips_per_unit} 枚代幣{bonusNote(Number(rc.chips_per_unit) || 0)}
+        （需達成喊出的數量才算成功；獲得代幣數 = 完成數量 × 每單位代幣數）
       </p>
     )
-  if (teaser.type === 'steal') return <p className="text-sm">獎勵：偷取目標隊伍 {rc.steal_pct}% 的代幣</p>
-  if (teaser.type === 'multiplier') return <p className="text-sm">獎勵：己隊代幣 +{rc.multiplier_pct}%</p>
+  if (teaser.type === 'steal') return <p className="text-sm">獎勵：偷取目標隊伍 {rc.steal_pct}% 的代幣{bonusNote(Number(rc.steal_pct) || 0)}</p>
+  if (teaser.type === 'multiplier') return <p className="text-sm">獎勵：己隊代幣 +{rc.multiplier_pct}%{bonusNote(Number(rc.multiplier_pct) || 0)}</p>
   return null
 }

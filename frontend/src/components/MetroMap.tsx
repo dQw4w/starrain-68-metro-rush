@@ -1,12 +1,14 @@
 import L from 'leaflet'
 import { CircleMarker, MapContainer, Marker, Polyline, TileLayer, Tooltip } from 'react-leaflet'
-import { CHALLENGE_TYPE_LABELS, challengeIconHtml } from './ChallengeIcon'
+import { CHALLENGE_TYPE_LABELS, challengeIconHtml, failBonusPct } from './ChallengeIcon'
 import type { ChallengeTeaser, DevicePosition, MapData, Station, TeamPublic } from '../types'
 
 interface MetroMapProps {
   mapData: MapData
   teams: TeamPublic[]
   challenges?: ChallengeTeaser[]
+  /** % reward bonus per prior team that failed a challenge — for the 🔥 badge tooltip. */
+  failBonusStepPct?: number
   gps?: DevicePosition[]
   onStationClick?: (station: Station) => void
   onChallengeClick?: (challenge: ChallengeTeaser) => void
@@ -20,6 +22,7 @@ export default function MetroMap({
   mapData,
   teams,
   challenges = [],
+  failBonusStepPct = 0,
   gps = [],
   onStationClick,
   onChallengeClick,
@@ -87,6 +90,11 @@ export default function MetroMap({
                 <div>
                   <div style={{ fontWeight: 700 }}>{ch.name}</div>
                   <div>{CHALLENGE_TYPE_LABELS[ch.type]}</div>
+                  {ch.prior_fail_count > 0 && (
+                    <div style={{ color: '#DC2626', fontWeight: 700 }}>
+                      🔥 已有 {ch.prior_fail_count} 隊失敗 · 加成 +{failBonusPct(ch, failBonusStepPct)}%
+                    </div>
+                  )}
                 </div>
               </Tooltip>
             </Marker>

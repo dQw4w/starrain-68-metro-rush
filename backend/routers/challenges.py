@@ -21,7 +21,11 @@ def _to_challenge(row) -> Challenge:
 @router.get("/api/map/challenges", response_model=list[ChallengeTeaser])
 async def list_active_challenges():
     pool = get_pool()
-    rows = await pool.fetch("SELECT * FROM challenges WHERE pool_state = 'active' ORDER BY id")
+    rows = await pool.fetch(
+        """SELECT c.*, (SELECT COUNT(*) FROM challenge_attempts
+                         WHERE challenge_id = c.id AND status = 'failed') AS prior_fail_count
+           FROM challenges c WHERE c.pool_state = 'active' ORDER BY c.id"""
+    )
     return [
         ChallengeTeaser(**{k: v for k, v in _to_challenge(r).model_dump().items() if k in ChallengeTeaser.model_fields})
         for r in rows
@@ -42,7 +46,12 @@ async def team_challenge_detail(token: str, challenge_id: int):
     )
     if attempt is None or attempt["status"] == "pending_start_approval":
         raise HTTPException(status_code=403, detail="尚未獲得管理員核准開始，無法查看任務內容")
-    row = await pool.fetchrow("SELECT * FROM challenges WHERE id = $1", challenge_id)
+    row = await pool.fetchrow(
+        """SELECT c.*, (SELECT COUNT(*) FROM challenge_attempts
+                         WHERE challenge_id = c.id AND status = 'failed') AS prior_fail_count
+           FROM challenges c WHERE c.id = $1""",
+        challenge_id,
+    )
     if row is None:
         raise HTTPException(status_code=404, detail="找不到此任務")
     return _to_challenge(row)
