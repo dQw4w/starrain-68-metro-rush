@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { api } from '../api'
 import ActionLogList from '../components/ActionLogList'
 import GameClock from '../components/GameClock'
+import ChallengeCoordEditor from '../components/ChallengeCoordEditor'
 import LineWaypointEditor from '../components/LineWaypointEditor'
 import RankingBoard from '../components/RankingBoard'
 import StationCoordEditor from '../components/StationCoordEditor'
@@ -150,7 +151,7 @@ export default function SuperAdminPage() {
           />
         )}
 
-        {tab === 'waypoints' && <GeoEditorTab token={token} />}
+        {tab === 'waypoints' && <GeoEditorTab token={token} challenges={challenges} />}
 
         {tab === 'log' && <ActionLogList entries={log} />}
       </main>
@@ -728,8 +729,8 @@ function ConfigTab({ config, onSave }: { config: GameConfig; onSave: (patch: Par
   )
 }
 
-function GeoEditorTab({ token }: { token: string }) {
-  const [mode, setMode] = useState<'stations' | 'waypoints'>('stations')
+function GeoEditorTab({ token, challenges }: { token: string; challenges: Challenge[] }) {
+  const [mode, setMode] = useState<'stations' | 'waypoints' | 'challenges'>('stations')
   return (
     <div className="flex flex-col gap-3">
       <div className="flex gap-2">
@@ -745,8 +746,16 @@ function GeoEditorTab({ token }: { token: string }) {
         >
           路線波點
         </button>
+        <button
+          onClick={() => setMode('challenges')}
+          className={`text-sm font-bold rounded-lg px-3 py-1.5 ${mode === 'challenges' ? 'bg-purple-600' : 'bg-white/10'}`}
+        >
+          任務座標
+        </button>
       </div>
-      {mode === 'stations' ? <StationCoordEditor /> : <LineWaypointEditor token={token} />}
+      {mode === 'stations' && <StationCoordEditor />}
+      {mode === 'waypoints' && <LineWaypointEditor token={token} />}
+      {mode === 'challenges' && <ChallengeCoordEditor challenges={challenges} />}
     </div>
   )
 }

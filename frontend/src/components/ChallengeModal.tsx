@@ -86,6 +86,9 @@ export default function ChallengeModal({
         </div>
         <p className="text-sm text-purple-300 mb-1">{TYPE_LABELS[teaser.type]}</p>
         {teaser.location_name && <p className="text-sm text-white/60 mb-3">📍 {teaser.location_name}</p>}
+        {teaser.image_url && (
+          <img src={teaser.image_url} alt="" className="w-full max-h-56 object-cover rounded-xl mb-3" />
+        )}
         {teaser.prior_fail_count > 0 && (
           <p className="text-sm font-bold text-rose-400 bg-rose-500/10 rounded-lg px-3 py-2 mb-3">
             🔥 已有 {teaser.prior_fail_count} 隊挑戰失敗，本次挑戰獎勵加成 +{bonusPct}%
