@@ -77,6 +77,22 @@ _CONTENT: dict[str, tuple[str, str]] = {
     ),
 }
 
+# name -> admin_notes. The answer key / judging reference for whoever
+# approves that challenge's challenge_result request (a team admin, or the
+# super admin acting as backup approver) — rendered right on the approval
+# card (see routers/admin.py's /challenges and TeamAdminPage.tsx). Never
+# reaches a team: absent from ChallengeTeaser and from the team-scoped
+# detail endpoint (see models.py's ChallengeAdminView docstring).
+_ADMIN_NOTES: dict[str, str] = {
+    "台大二活任務": (
+        "社團是否存在二活，逐一詢問時對照：社團A(有) 社團B(無) 社團C(無) 社團D(無) "
+        "社團E(有) 社團F(有) 社團G(無)　※ 目前仍是 placeholder，正式上線前請換成真實的7個社團與答案。"
+    ),
+    "葫洲站早午餐任務": "正確店家：ieat早午餐（真極品牛肉麵）。找錯家直接判失敗，只有一次機會。",
+    "忠孝敦化街機任務": "正確地點：明曜百貨11樓卡通尼樂園。務必確認機台當下無人在玩，合照才算數。",
+    "台北地下街任務": "正確答案：825公尺。誤差在100公尺（含）以內都算成功。",
+}
+
 # name -> image_url. A reference photo shown alongside the challenge's public
 # teaser (visible on the map before a team even starts it — see
 # ChallengeTeaser in frontend/src/types.ts) — so it must show what to look
@@ -84,9 +100,9 @@ _CONTENT: dict[str, tuple[str, str]] = {
 # in frontend/public/challenge-images/ (see the README there) and are served
 # at this exact path by the built SPA.
 _IMAGES: dict[str, str] = {
-    "忠孝敦化街機任務": "/challenge-images/ddr-machine.jpg",
-    "西門動漫朝聖任務": "/challenge-images/kousaka-honoka.jpg",
-    "美麗華摩天輪任務": "/challenge-images/miramar-stairs.jpg",
+    "忠孝敦化街機任務": "/challenge-images/ddr-machine.png",
+    "西門動漫朝聖任務": "/challenge-images/kousaka-honoka.png",
+    "美麗華摩天輪任務": "/challenge-images/miramar-stairs.png",
 }
 
 # Manual coordinate corrections, keyed by (map-visible) challenge name —
@@ -136,27 +152,19 @@ _CHALLENGES: list[tuple] = [
     ("剝皮寮歷史街區任務", "steal", {"steal_pct": 26}, "剝皮寮歷史街區", 25.0358, 121.5028, "queued"),
     ("台北植物園任務", "multiplier", {"multiplier_pct": 14}, "台北植物園", 25.0316, 121.5106, "queued"),
 
-    # --- Real, content-written challenges (see _CONTENT above) ---
-    # ADMIN ONLY — never put this in _CONTENT's description, it must not
-    # reach the team via the API. Current answer key is still a placeholder,
-    # swap in the real 7 club names/answers before this goes active:
-    #   社團A (有)  社團B (無)  社團C (無)  社團D (無)
-    #   社團E (有)  社團F (有)  社團G (無)
+    # --- Real, content-written challenges (see _CONTENT / _ADMIN_NOTES above) ---
     ("台大二活任務", "fixed", {"chips": 50}, "台大二活門口", 25.0184, 121.5388, "queued"),
     ("西門動漫朝聖任務", "fixed", {"chips": 80}, "西門站5號出口", 25.0424, 121.5077, "queued"),
     ("建成圓環任務", "variable", {"chips_per_unit": 1, "unit_label": "數字"}, "建成圓環", 25.0576, 121.5126, "queued"),
     ("台北地下街任務", "steal", {"steal_pct": 50}, "台北地下街Y1出口", 25.0526, 121.5203, "queued"),
 
-    # ADMIN ONLY — correct shop is "ieat早午餐（真極品牛肉麵）". Coordinates are
-    # nudged ~90m off the exact 葫洲站 point (25.072689, 121.607242) so the
+    # Coordinates nudged ~50-90m off the exact station point (葫洲站
+    # 25.072689, 121.607242 / 忠孝敦化站 25.041495, 121.549656) so the
     # challenge pin doesn't render on top of the station dot on the map;
-    # refine with the superadmin 任務座標 tool once the shop's real spot is
+    # refine with the superadmin 任務座標 tool once the real spot is
     # confirmed on the ground.
     ("葫洲站早午餐任務", "fixed", {"chips": 30}, "葫洲站", 25.071989, 121.607842, "queued"),
     ("美麗華摩天輪任務", "variable", {"chips_per_unit": 50, "unit_label": "趟"}, "美麗華百樂園", 25.0833, 121.5828, "queued"),
-    # ADMIN ONLY — correct arcade is "明曜百貨11樓卡通尼樂園". Coordinates are
-    # nudged slightly off the exact 忠孝敦化站 point (25.041495, 121.549656)
-    # for the same map-overlap reason as above.
     ("忠孝敦化街機任務", "fixed", {"chips": 40}, "忠孝敦化站", 25.042195, 121.550256, "queued"),
 ]
 
@@ -173,12 +181,15 @@ async def seed(conn) -> None:
         inner_title, description = _CONTENT.get(name, (TBD, TBD))
         lat, lng = _COORD_OVERRIDES.get(name, (lat, lng))
         image_url = _IMAGES.get(name)
+        admin_notes = _ADMIN_NOTES.get(name, "")
         await conn.execute(
-            """INSERT INTO challenges (name, inner_title, description, type, reward_config, location_name, lat, lng, image_url, pool_state)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+            """INSERT INTO challenges (name, inner_title, description, type, reward_config, location_name, lat, lng, image_url, admin_notes, pool_state)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
                ON CONFLICT (name) DO UPDATE
                SET inner_title = EXCLUDED.inner_title, description = EXCLUDED.description, type = EXCLUDED.type,
                    reward_config = EXCLUDED.reward_config, location_name = EXCLUDED.location_name,
-                   lat = EXCLUDED.lat, lng = EXCLUDED.lng, image_url = EXCLUDED.image_url""",
-            name, inner_title, description, ctype, json.dumps(reward_config), location_name, lat, lng, image_url, initial_state,
+                   lat = EXCLUDED.lat, lng = EXCLUDED.lng, image_url = EXCLUDED.image_url,
+                   admin_notes = EXCLUDED.admin_notes""",
+            name, inner_title, description, ctype, json.dumps(reward_config), location_name, lat, lng, image_url,
+            admin_notes, initial_state,
         )

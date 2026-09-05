@@ -136,6 +136,10 @@ export interface Challenge {
 /** Public listing shape: no `inner_title`/`description` — hidden until a team's admin approves the start. */
 export type ChallengeTeaser = Omit<Challenge, 'inner_title' | 'description'>
 
+/** Challenge plus the answer key/judging notes — admin-authenticated reads only
+ * (superadmin CRUD, and the team-admin's judging queue). Never sent to a team. */
+export type ChallengeAdminView = Challenge & { admin_notes: string }
+
 export interface ChallengeAttempt {
   id: number
   challenge_id: number

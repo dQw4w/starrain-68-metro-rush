@@ -271,6 +271,16 @@ class Challenge(BaseModel):
     prior_fail_count: int = 0
 
 
+class ChallengeAdminView(Challenge):
+    """Challenge plus the answer key/judging notes — for admin-authenticated
+    reads only (superadmin CRUD, and the team-admin's judging queue in
+    routers/admin.py). Never used for the public teaser or the team-scoped
+    detail endpoint (both stay on the plain Challenge model above, which
+    doesn't declare this field, so a DB row's extra admin_notes column is
+    silently dropped there rather than leaking to a team)."""
+    admin_notes: str = ""
+
+
 class ChallengeTeaser(BaseModel):
     """Public listing shape: location + reward are known upfront, but the task
     description itself stays hidden until a team's admin approves the start
@@ -297,6 +307,7 @@ class ChallengeCreate(BaseModel):
     lat: Optional[float] = None
     lng: Optional[float] = None
     image_url: Optional[str] = None
+    admin_notes: str = ""
     pool_state: Literal["queued", "active", "retired"] = "queued"
 
 
@@ -310,6 +321,7 @@ class ChallengeUpdate(BaseModel):
     lat: Optional[float] = None
     lng: Optional[float] = None
     image_url: Optional[str] = None
+    admin_notes: Optional[str] = None
     pool_state: Optional[Literal["queued", "active", "retired"]] = None
 
 
@@ -328,9 +340,14 @@ class ChallengeAttempt(BaseModel):
 
 
 class ChallengeStartRequest(BaseModel):
-    called_shot_value: Optional[PositiveInt] = None
     target_team_id: Optional[int] = None
     requested_by: Optional[str] = None
+
+
+class ChallengeShotSubmit(BaseModel):
+    """Body for a call-your-shot (variable) challenge's submit-shot step —
+    see submit_challenge_shot in game_logic.py."""
+    called_shot_value: PositiveInt
 
 
 # ---------------------------------------------------------------------------

@@ -7,7 +7,7 @@ import MetroMap from '../components/MetroMap'
 import ToastStack, { useToastQueue } from '../components/ToastStack'
 import { usePhase } from '../hooks/usePhase'
 import { useWebSocket, type WsEvent } from '../hooks/useWebSocket'
-import type { ActionLogEntry, ApprovalRequest, ChallengeTeaser, DevicePosition, MapData, TeamPublic } from '../types'
+import type { ActionLogEntry, ApprovalRequest, ChallengeAdminView, DevicePosition, MapData, TeamPublic } from '../types'
 
 const KIND_LABELS: Record<string, string> = {
   claim: '佔領車站',
@@ -34,7 +34,7 @@ export default function TeamAdminPage() {
   const [log, setLog] = useState<ActionLogEntry[]>([])
   const [gps, setGps] = useState<DevicePosition[]>([])
   const [mapData, setMapData] = useState<MapData | null>(null)
-  const [challenges, setChallenges] = useState<ChallengeTeaser[]>([])
+  const [challenges, setChallenges] = useState<ChallengeAdminView[]>([])
   const [tab, setTab] = useState<'queue' | 'log' | 'gps' | 'adjust'>('queue')
   const [error, setError] = useState('')
   const [busyId, setBusyId] = useState<number | null>(null)
@@ -67,8 +67,8 @@ export default function TeamAdminPage() {
     if (!teamId) return
     refresh()
     api.getMap().then(setMapData).catch(() => {})
-    api.getActiveChallenges().then(setChallenges).catch(() => {})
-  }, [teamId, refresh])
+    api.adminChallenges(token, teamId).then(setChallenges).catch(() => {})
+  }, [teamId, refresh, token])
 
   const getTicket = useCallback(async () => {
     if (!token) throw new Error('not logged in')
@@ -81,9 +81,9 @@ export default function TeamAdminPage() {
       if (ev.team_id !== undefined && ev.team_id !== teamId) return
       if (['admin_pending', 'team_update', 'gps_update'].includes(ev.type)) refresh()
       if (ev.type === 'map_update') api.getMap().then(setMapData)
-      if (ev.type === 'challenge_pool') {
-        api.getActiveChallenges().then(setChallenges)
-        if (teamId) api.adminLog(token, teamId).then(setLog)
+      if (ev.type === 'challenge_pool' && teamId) {
+        api.adminChallenges(token, teamId).then(setChallenges)
+        api.adminLog(token, teamId).then(setLog)
       }
       if (ev.type === 'config_update') refetchPhase()
       if (ev.type === 'activity_log') {
@@ -244,7 +244,7 @@ function PendingCard({
   busy: boolean
   stationName: (id: number) => string
   challengeName: (id: number) => string
-  challengeById: (id: number) => ChallengeTeaser | undefined
+  challengeById: (id: number) => ChallengeAdminView | undefined
   onApprove: (body?: { success: boolean }) => void
   onDeny: () => void
 }) {
@@ -290,6 +290,12 @@ function PendingCard({
           {req.kind === 'challenge_result' && chipsPerUnit > 0 && (
             <span className="text-emerald-400"> · 判定成功可得 {calledShotValue * chipsPerUnit} 枚代幣</span>
           )}
+        </p>
+      )}
+      {req.kind === 'challenge_result' && challenge?.admin_notes && (
+        <p className="mt-2 bg-amber-500/10 border border-amber-400/30 rounded-lg px-2.5 py-2 text-xs text-amber-200 whitespace-pre-wrap">
+          <span className="font-bold">📋 答案／判定備註：</span>
+          {challenge.admin_notes}
         </p>
       )}
 

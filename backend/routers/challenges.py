@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from auth import AdminIdentity, require_superadmin
 from db import get_pool
-from models import Challenge, ChallengeCreate, ChallengeTeaser, ChallengeUpdate
+from models import Challenge, ChallengeAdminView, ChallengeCreate, ChallengeTeaser, ChallengeUpdate
 from game_logic import activate_initial_pool, log_challenge_published
 from ws import manager
 
@@ -16,6 +16,15 @@ def _to_challenge(row) -> Challenge:
     if isinstance(d["reward_config"], str):
         d["reward_config"] = json.loads(d["reward_config"])
     return Challenge(**d)
+
+
+def to_challenge_admin(row) -> ChallengeAdminView:
+    """Same row-shaping as _to_challenge, but keeps admin_notes — only ever
+    call this for an admin-authenticated response (see ChallengeAdminView)."""
+    d = dict(row)
+    if isinstance(d["reward_config"], str):
+        d["reward_config"] = json.loads(d["reward_config"])
+    return ChallengeAdminView(**d)
 
 
 @router.get("/api/map/challenges", response_model=list[ChallengeTeaser])
@@ -57,29 +66,29 @@ async def team_challenge_detail(token: str, challenge_id: int):
     return _to_challenge(row)
 
 
-@router.get("/api/superadmin/challenges", response_model=list[Challenge])
+@router.get("/api/superadmin/challenges", response_model=list[ChallengeAdminView])
 async def list_all_challenges(_: AdminIdentity = Depends(require_superadmin)):
     pool = get_pool()
     rows = await pool.fetch("SELECT * FROM challenges ORDER BY id")
-    return [_to_challenge(r) for r in rows]
+    return [to_challenge_admin(r) for r in rows]
 
 
-@router.post("/api/superadmin/challenges", response_model=Challenge)
+@router.post("/api/superadmin/challenges", response_model=ChallengeAdminView)
 async def create_challenge(body: ChallengeCreate, _: AdminIdentity = Depends(require_superadmin)):
     pool = get_pool()
     row = await pool.fetchrow(
-        """INSERT INTO challenges (name, inner_title, description, type, reward_config, location_name, lat, lng, image_url, pool_state)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *""",
+        """INSERT INTO challenges (name, inner_title, description, type, reward_config, location_name, lat, lng, image_url, admin_notes, pool_state)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *""",
         body.name, body.inner_title, body.description, body.type, json.dumps(body.reward_config), body.location_name,
-        body.lat, body.lng, body.image_url, body.pool_state,
+        body.lat, body.lng, body.image_url, body.admin_notes, body.pool_state,
     )
     if body.pool_state == "active":
         await manager.broadcast_global("challenge_pool")
         await log_challenge_published(pool, row["id"], row["name"])
-    return _to_challenge(row)
+    return to_challenge_admin(row)
 
 
-@router.put("/api/superadmin/challenges/{challenge_id}", response_model=Challenge)
+@router.put("/api/superadmin/challenges/{challenge_id}", response_model=ChallengeAdminView)
 async def update_challenge(challenge_id: int, body: ChallengeUpdate, _: AdminIdentity = Depends(require_superadmin)):
     pool = get_pool()
     fields = body.model_dump(exclude_unset=True)
@@ -101,7 +110,7 @@ async def update_challenge(challenge_id: int, body: ChallengeUpdate, _: AdminIde
     await manager.broadcast_global("challenge_pool")
     if fields.get("pool_state") == "active" and prev_pool_state != "active":
         await log_challenge_published(pool, row["id"], row["name"])
-    return _to_challenge(row)
+    return to_challenge_admin(row)
 
 
 @router.post("/api/superadmin/challenges/activate-pool")

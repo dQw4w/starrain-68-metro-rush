@@ -4,7 +4,7 @@ import type { Challenge, ChallengeAttempt, ChallengeTeaser, TeamPublic } from '.
 
 const TYPE_LABELS: Record<string, string> = {
   ...CHALLENGE_TYPE_LABELS,
-  variable: '猜拳式獎勵（需先喊出目標數量）',
+  variable: '猜拳式獎勵（核准開始後才喊出目標數量）',
 }
 
 /** Positive-integer-only text (mini task counts are never fractional or negative). Empty string is allowed while typing/clearing. */
@@ -20,7 +20,9 @@ interface Props {
   /** % reward bonus per prior team that failed this challenge. */
   failBonusStepPct: number
   onClose: () => void
-  onStart: (body: { called_shot_value?: number; target_team_id?: number }) => Promise<void>
+  onStart: (body: { target_team_id?: number }) => Promise<void>
+  /** Call-your-shot (variable) challenges only — submitted once in_progress, after the team has seen the full task description. */
+  onSubmitShot: (calledShotValue: number) => Promise<void>
 }
 
 export default function ChallengeModal({
@@ -33,6 +35,7 @@ export default function ChallengeModal({
   failBonusStepPct,
   onClose,
   onStart,
+  onSubmitShot,
 }: Props) {
   const [calledShot, setCalledShot] = useState('')
   const [targetTeamId, setTargetTeamId] = useState<number | ''>('')
@@ -54,11 +57,23 @@ export default function ChallengeModal({
     setError('')
     try {
       await onStart({
-        called_shot_value: calledShotValue ?? undefined,
         target_team_id: targetTeamId === '' ? undefined : Number(targetTeamId),
       })
     } catch (e: any) {
       setError(e.message || '操作失敗')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function handleSubmitShot() {
+    if (calledShotValue === null) return
+    setBusy(true)
+    setError('')
+    try {
+      await onSubmitShot(calledShotValue)
+    } catch (e: any) {
+      setError(e.message || '送出失敗')
     } finally {
       setBusy(false)
     }
@@ -100,7 +115,44 @@ export default function ChallengeModal({
 
         {!attempt && !hasPendingRequest && (
           <div className="mt-4 flex flex-col gap-3">
-            {teaser.type === 'variable' && (
+            {teaser.type === 'steal' && (
+              <label className="text-sm">
+                選擇偷竊目標隊伍
+                <select
+                  value={targetTeamId}
+                  onChange={(e) => setTargetTeamId(e.target.value === '' ? '' : Number(e.target.value))}
+                  className="mt-1 w-full bg-white/10 rounded-lg px-3 py-2"
+                >
+                  <option value="">請選擇</option>
+                  {otherTeams.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+            <button
+              disabled={busy || (teaser.type === 'steal' && targetTeamId === '')}
+              onClick={handleStart}
+              className="bg-purple-600 disabled:opacity-40 font-bold rounded-xl py-3"
+            >
+              挑戰任務（需管理員核准）
+            </button>
+          </div>
+        )}
+
+        {hasPendingRequest && !attempt && (
+          <p className="mt-4 text-amber-300 font-medium">⏳ 等待隨隊管理員核准開始任務…</p>
+        )}
+
+        {attempt && attempt.status === 'in_progress' && (
+          <div className="mt-4 flex flex-col gap-3">
+            <div className="bg-white/5 rounded-xl p-3 text-sm whitespace-pre-wrap">
+              {fullDetail ? fullDetail.description : '任務內容載入中…'}
+            </div>
+
+            {teaser.type === 'variable' && attempt.called_shot_value == null ? (
               <label className="text-sm">
                 喊出目標數量（必填）—— 欲挑戰的「{unitLabel}」數量（非代幣數量），須為正整數
                 <input
@@ -120,49 +172,21 @@ export default function ChallengeModal({
                     {bonusPct > 0 && `（含 +${bonusPct}% 加成後為 ${Math.round(calledShotValue * chipsPerUnit * (1 + bonusPct / 100))}）`}
                   </p>
                 )}
-              </label>
-            )}
-            {teaser.type === 'steal' && (
-              <label className="text-sm">
-                選擇偷竊目標隊伍
-                <select
-                  value={targetTeamId}
-                  onChange={(e) => setTargetTeamId(e.target.value === '' ? '' : Number(e.target.value))}
-                  className="mt-1 w-full bg-white/10 rounded-lg px-3 py-2"
+                <button
+                  disabled={busy || calledShotValue === null}
+                  onClick={handleSubmitShot}
+                  className="mt-2 w-full bg-purple-600 disabled:opacity-40 font-bold rounded-xl py-3"
                 >
-                  <option value="">請選擇</option>
-                  {otherTeams.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.name}
-                    </option>
-                  ))}
-                </select>
+                  送出
+                </button>
               </label>
+            ) : (
+              <p className="text-amber-300 font-bold text-center py-2">
+                {teaser.type === 'variable' && attempt.called_shot_value != null
+                  ? `🚀 已喊出目標數量：${attempt.called_shot_value}，請等待隨隊管理員判定成功或失敗`
+                  : '🚀 任務進行中，請等待隨隊管理員判定成功或失敗'}
+              </p>
             )}
-            <button
-              disabled={
-                busy ||
-                (teaser.type === 'steal' && targetTeamId === '') ||
-                (teaser.type === 'variable' && calledShotValue === null)
-              }
-              onClick={handleStart}
-              className="bg-purple-600 disabled:opacity-40 font-bold rounded-xl py-3"
-            >
-              開始任務（需管理員核准）
-            </button>
-          </div>
-        )}
-
-        {hasPendingRequest && !attempt && (
-          <p className="mt-4 text-amber-300 font-medium">⏳ 等待隨隊管理員核准開始任務…</p>
-        )}
-
-        {attempt && attempt.status === 'in_progress' && (
-          <div className="mt-4 flex flex-col gap-3">
-            <div className="bg-white/5 rounded-xl p-3 text-sm whitespace-pre-wrap">
-              {fullDetail ? fullDetail.description : '任務內容載入中…'}
-            </div>
-            <p className="text-amber-300 font-bold text-center py-2">🚀 任務進行中，請等待隨隊管理員判定成功或失敗</p>
           </div>
         )}
 

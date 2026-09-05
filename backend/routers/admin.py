@@ -14,10 +14,12 @@ from models import (
     ActionLogEntry,
     AdjustChipsBody,
     ApprovalRequestOut,
+    ChallengeAdminView,
     DevicePosition,
     ResolveChallengeResultBody,
     TeamPublic,
 )
+from routers.challenges import to_challenge_admin
 from ws import manager
 
 router = APIRouter(prefix="/api/admin/team/{team_id}", tags=["admin"])
@@ -91,6 +93,23 @@ async def deny_request(team_id: int, request_id: int, admin: AdminIdentity = Dep
     # "deny and let the team resubmit" path anymore, since the team never
     # submits a result themselves.
     raise HTTPException(status_code=400, detail="未知的請求類型")
+
+
+@router.get("/challenges", response_model=list[ChallengeAdminView])
+async def team_admin_challenges(team_id: int, admin: AdminIdentity = Depends(get_current_admin)):
+    """Same active-pool challenge list a team sees on the map (GET
+    /api/map/challenges), but for the judging admin — includes admin_notes
+    (the answer key, if any) so a challenge_result approval can be checked
+    without leaving this page. Content is global, same as /log;
+    assert_team_scope only gates *access* to this admin surface."""
+    assert_team_scope(admin, team_id)
+    pool = get_pool()
+    rows = await pool.fetch(
+        """SELECT c.*, (SELECT COUNT(*) FROM challenge_attempts
+                         WHERE challenge_id = c.id AND status = 'failed') AS prior_fail_count
+           FROM challenges c WHERE c.pool_state = 'active' ORDER BY c.id"""
+    )
+    return [to_challenge_admin(r) for r in rows]
 
 
 @router.get("/gps", response_model=list[DevicePosition])

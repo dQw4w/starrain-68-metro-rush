@@ -170,10 +170,16 @@ export default function TeamPage() {
     await refreshState()
   }
 
-  async function submitChallengeStart(body: { called_shot_value?: number; target_team_id?: number }) {
+  async function submitChallengeStart(body: { target_team_id?: number }) {
     if (!token || !selectedChallenge) return
     await api.challengeStart(token, selectedChallenge.id, body)
     await refreshState()
+  }
+
+  async function submitChallengeShot(calledShotValue: number) {
+    if (!token || !selectedChallenge) return
+    await api.challengeSubmitShot(token, selectedChallenge.id, calledShotValue)
+    await refreshAttempts()
   }
 
   return (
@@ -260,6 +266,7 @@ export default function TeamPage() {
           failBonusStepPct={failBonusStepPct}
           onClose={() => setSelectedChallenge(null)}
           onStart={submitChallengeStart}
+          onSubmitShot={submitChallengeShot}
         />
       )}
     </div>

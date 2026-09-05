@@ -2,6 +2,7 @@ import type {
   ActionLogEntry,
   ApprovalRequest,
   Challenge,
+  ChallengeAdminView,
   ChallengeAttempt,
   ChallengeTeaser,
   DevicePosition,
@@ -61,8 +62,13 @@ export const api = {
   teamAction: (token: string, station_id: number, kind: 'claim' | 'topup', amount: number) =>
     req<any>(`/team/${token}/action`, { method: 'POST', body: JSON.stringify({ station_id, kind, amount }) }),
   getPublicConfig: () => req<{ starting_chips: number; max_deposit_per_visit: number; fail_bonus_step_pct: number }>('/config/public'),
-  challengeStart: (token: string, challengeId: number, body: { called_shot_value?: number; target_team_id?: number }) =>
+  challengeStart: (token: string, challengeId: number, body: { target_team_id?: number; requested_by?: string }) =>
     req<any>(`/team/${token}/challenge/${challengeId}/start`, { method: 'POST', body: JSON.stringify(body) }),
+  challengeSubmitShot: (token: string, challengeId: number, called_shot_value: number) =>
+    req<any>(`/team/${token}/challenge/${challengeId}/submit-shot`, {
+      method: 'POST',
+      body: JSON.stringify({ called_shot_value }),
+    }),
   myAttempts: (token: string) => req<ChallengeAttempt[]>(`/team/${token}/my-attempts`),
   challengeDetail: (token: string, challengeId: number) => req<Challenge>(`/team/${token}/challenge/${challengeId}`),
   gpsPing: (token: string, device_id: string, lat: number, lng: number) =>
@@ -85,6 +91,8 @@ export const api = {
     req<any>(`/admin/team/${teamId}/deny/${requestId}`, { method: 'POST', headers: authHeaders(token) }),
   adminGps: (token: string, teamId: number) =>
     req<DevicePosition[]>(`/admin/team/${teamId}/gps`, { headers: authHeaders(token) }),
+  adminChallenges: (token: string, teamId: number) =>
+    req<ChallengeAdminView[]>(`/admin/team/${teamId}/challenges`, { headers: authHeaders(token) }),
   adminLog: (token: string, teamId: number) =>
     req<ActionLogEntry[]>(`/admin/team/${teamId}/log`, { headers: authHeaders(token) }),
   adminAdjustChips: (token: string, teamId: number, delta: number, reason: string) =>

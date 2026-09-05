@@ -10,10 +10,12 @@ from game_logic import (
     get_pending_for_team,
     get_phase,
     get_ranking,
+    submit_challenge_shot,
 )
 from models import (
     ActionLogEntry,
     ApprovalRequestOut,
+    ChallengeShotSubmit,
     ChallengeStartRequest,
     ClaimRequestCreate,
     DevicePosition,
@@ -99,8 +101,15 @@ async def team_action(token: str, body: ClaimRequestCreate):
 async def challenge_start(token: str, challenge_id: int, body: ChallengeStartRequest):
     team = await _team_by_token(token)
     return await create_challenge_start_request(
-        team["id"], challenge_id, body.called_shot_value, body.target_team_id, body.requested_by
+        team["id"], challenge_id, body.target_team_id, body.requested_by
     )
+
+
+@router.post("/challenge/{challenge_id}/submit-shot", response_model=dict)
+async def challenge_submit_shot(token: str, challenge_id: int, body: ChallengeShotSubmit):
+    """Call-your-shot (variable) challenges only — see submit_challenge_shot."""
+    team = await _team_by_token(token)
+    return await submit_challenge_shot(team["id"], challenge_id, body.called_shot_value)
 
 
 @router.get("/my-attempts")

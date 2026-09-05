@@ -323,7 +323,7 @@ async def resolve_action_request(request_id: int, admin_id: int, approve: bool) 
 # Challenges
 # ---------------------------------------------------------------------------
 
-async def create_challenge_start_request(team_id: int, challenge_id: int, called_shot_value: int | None,
+async def create_challenge_start_request(team_id: int, challenge_id: int,
                                            target_team_id: int | None, requested_by: str | None) -> dict:
     await assert_active_phase()
     pool = get_pool()
@@ -352,11 +352,12 @@ async def create_challenge_start_request(team_id: int, challenge_id: int, called
                     raise HTTPException(status_code=400, detail="此任務貴隊已經嘗試過了")
                 if challenge["type"] == "steal" and target_team_id is None:
                     raise HTTPException(status_code=400, detail="偷竊任務需指定目標隊伍")
-                if challenge["type"] == "variable" and called_shot_value is None:
-                    # The called number is now the sole reward driver (see
-                    # resolve_challenge_result) — without one, success would
-                    # always pay out 0, so it's required up front.
-                    raise HTTPException(status_code=400, detail="此任務需先喊出目標數量（Call Your Shot）")
+                # Call-your-shot (variable) challenges no longer take a called
+                # number at request time — the team only sees the task's real
+                # description once this start is approved (see
+                # resolve_challenge_start), and calls their shot afterward via
+                # submit_challenge_shot, which is what actually opens the
+                # challenge_result judging request.
 
                 # Exclusivity: one challenge is worked on by at most one team at a
                 # time (freed up again if that team fails — a success takes the
@@ -389,7 +390,7 @@ async def create_challenge_start_request(team_id: int, challenge_id: int, called
                     """INSERT INTO approval_requests (kind, team_id, challenge_id, requested_by, requested_value, status)
                        VALUES ('challenge_start', $1, $2, $3, $4, 'pending') RETURNING *""",
                     team_id, challenge_id, requested_by,
-                    json.dumps({"called_shot_value": called_shot_value, "target_team_id": target_team_id}),
+                    json.dumps({"target_team_id": target_team_id}),
                 )
                 result = {"status": "pending", "request": dict(req)}
                 events = [("notify_admin", team_id, "admin_pending")]
@@ -455,15 +456,17 @@ async def resolve_challenge_start(request_id: int, admin_id: int, approve: bool)
                     rv = req["requested_value"]
                     if isinstance(rv, str):
                         rv = json.loads(rv)
-                    called_shot_value = rv.get("called_shot_value")
                     target_team_id = rv.get("target_team_id")
 
+                    # called_shot_value always starts NULL here — for a
+                    # call-your-shot (variable) challenge it isn't chosen yet
+                    # (see submit_challenge_shot); every other type never uses it.
                     attempt = await conn.fetchrow(
                         """INSERT INTO challenge_attempts
-                               (challenge_id, team_id, status, called_shot_value, target_team_id,
+                               (challenge_id, team_id, status, target_team_id,
                                 fail_bonus_pct_locked, started_at)
-                           VALUES ($1, $2, 'in_progress', $3, $4, $5, now()) RETURNING *""",
-                        req["challenge_id"], req["team_id"], called_shot_value, target_team_id, fail_bonus_pct,
+                           VALUES ($1, $2, 'in_progress', $3, $4, now()) RETURNING *""",
+                        req["challenge_id"], req["team_id"], target_team_id, fail_bonus_pct,
                     )
                     await conn.execute(
                         """UPDATE approval_requests
@@ -471,18 +474,24 @@ async def resolve_challenge_start(request_id: int, admin_id: int, approve: bool)
                            WHERE id = $3""",
                         admin_id, attempt["id"], request_id,
                     )
-                    # Auto-create the result-judgment request right away: the team
-                    # admin now judges success/fail directly once the task is
-                    # visibly done, with no separate player "I'm finished, send for
-                    # approval" step in between (the player's screen just shows
-                    # "任務進行中" for the whole in_progress window).
-                    await conn.execute(
-                        """INSERT INTO approval_requests
-                               (kind, team_id, challenge_id, challenge_attempt_id, requested_value, status)
-                           VALUES ('challenge_result', $1, $2, $3, $4, 'pending')""",
-                        req["team_id"], req["challenge_id"], attempt["id"],
-                        json.dumps({"called_shot_value": called_shot_value, "target_team_id": target_team_id}),
-                    )
+                    if challenge["type"] != "variable":
+                        # Auto-create the result-judgment request right away: the
+                        # team admin now judges success/fail directly once the task
+                        # is visibly done, with no separate player "I'm finished,
+                        # send for approval" step in between (the player's screen
+                        # just shows "任務進行中" for the whole in_progress window).
+                        await conn.execute(
+                            """INSERT INTO approval_requests
+                                   (kind, team_id, challenge_id, challenge_attempt_id, requested_value, status)
+                               VALUES ('challenge_result', $1, $2, $3, $4, 'pending')""",
+                            req["team_id"], req["challenge_id"], attempt["id"],
+                            json.dumps({"called_shot_value": None, "target_team_id": target_team_id}),
+                        )
+                    # else: a call-your-shot (variable) challenge doesn't get its
+                    # challenge_result request yet — the team now sees the full
+                    # task description for the first time (this in_progress
+                    # window) and only commits to a number afterward, via
+                    # submit_challenge_shot, which creates that request itself.
                     start_msg = f"任務「{challenge['name']}」開始"
                     await _log(conn, req["team_id"], "admin", "challenge_start_approved",
                                challenge_id=req["challenge_id"], message=start_msg)
@@ -493,6 +502,58 @@ async def resolve_challenge_start(request_id: int, admin_id: int, approve: bool)
                         ("notify_admin", req["team_id"], "admin_pending"),
                         _activity_event(req["team_id"], team_name, "challenge_start_approved", start_msg),
                     ]
+
+    await _fire(events)
+    return result
+
+
+async def submit_challenge_shot(team_id: int, challenge_id: int, called_shot_value: int) -> dict:
+    """Call-your-shot (variable) challenges only. The team commits to a
+    target number once they're already mid-task — attempt is 'in_progress'
+    and they've had the full description/rules in front of them (see
+    resolve_challenge_start) — rather than blind at request time. This is
+    what actually opens the challenge_result judging request; before this
+    call, the admin's queue has nothing to judge for this attempt yet."""
+    await assert_active_phase()
+    pool = get_pool()
+    result: dict = {}
+    events: list[tuple] = []
+
+    async with pool.acquire() as conn:
+        async with conn.transaction():
+            attempt = await conn.fetchrow(
+                "SELECT * FROM challenge_attempts WHERE challenge_id = $1 AND team_id = $2 FOR UPDATE",
+                challenge_id, team_id,
+            )
+            if attempt is None or attempt["status"] != "in_progress":
+                raise HTTPException(status_code=400, detail="此任務目前並非進行中，無法送出目標數量")
+            if attempt["called_shot_value"] is not None:
+                raise HTTPException(status_code=400, detail="此任務已經送出過目標數量")
+            challenge = await conn.fetchrow("SELECT * FROM challenges WHERE id = $1", challenge_id)
+            if challenge["type"] != "variable":
+                raise HTTPException(status_code=400, detail="此任務不需要喊出目標數量")
+
+            await conn.execute(
+                "UPDATE challenge_attempts SET called_shot_value = $1 WHERE id = $2",
+                called_shot_value, attempt["id"],
+            )
+            await conn.execute(
+                """INSERT INTO approval_requests
+                       (kind, team_id, challenge_id, challenge_attempt_id, requested_value, status)
+                   VALUES ('challenge_result', $1, $2, $3, $4, 'pending')""",
+                team_id, challenge_id, attempt["id"],
+                json.dumps({"called_shot_value": called_shot_value, "target_team_id": attempt["target_team_id"]}),
+            )
+            shot_msg = f"任務「{challenge['name']}」喊出目標數量：{called_shot_value}"
+            await _log(conn, team_id, "team", "challenge_shot_submitted",
+                       challenge_id=challenge_id, message=shot_msg)
+            result = {"status": "submitted", "called_shot_value": called_shot_value}
+            team_name = await _team_name(conn, team_id)
+            events = [
+                ("notify_team", team_id, "team_update"),
+                ("notify_admin", team_id, "admin_pending"),
+                _activity_event(team_id, team_name, "challenge_shot_submitted", shot_msg),
+            ]
 
     await _fire(events)
     return result

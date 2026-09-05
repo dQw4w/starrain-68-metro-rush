@@ -141,6 +141,15 @@ CREATE TABLE IF NOT EXISTS challenges (
 
 ALTER TABLE challenges ADD COLUMN IF NOT EXISTS inner_title TEXT NOT NULL DEFAULT '';
 
+-- Answer key / judging notes for whoever approves a challenge_result request
+-- (a team admin, or the super admin acting as backup approver) — e.g. which
+-- clubs actually exist, the correct shop name, the correct measurement.
+-- Never exposed to a team: absent from ChallengeTeaser and from the plain
+-- Challenge model the team-scoped detail endpoint returns, so it only ever
+-- reaches ChallengeAdminView (superadmin CRUD + the team-admin judging
+-- queue in routers/admin.py).
+ALTER TABLE challenges ADD COLUMN IF NOT EXISTS admin_notes TEXT NOT NULL DEFAULT '';
+
 -- Lets seed_challenges.py upsert by name instead of inserting a fresh
 -- duplicate row every time the seed data changes.
 CREATE UNIQUE INDEX IF NOT EXISTS idx_challenges_name ON challenges (name);
