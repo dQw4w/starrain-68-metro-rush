@@ -6,9 +6,8 @@ from auth import (
     create_session,
     delete_session,
     get_current_admin,
-    hash_pin,
     mint_ws_ticket,
-    verify_pin,
+    verify_superadmin_pin,
 )
 from db import get_pool
 from models import LoginRequest, LoginResponse, WsTicketResponse
@@ -18,10 +17,15 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 @router.post("/login", response_model=LoginResponse)
 async def login(body: LoginRequest):
-    """Super admin only. Team admins never enter a PIN — see /login-link."""
+    """Super admin only. Team admins never enter a PIN — see /login-link.
+    The PIN itself is never stored (see auth.verify_superadmin_pin) — only
+    the admin_id anchor (for sessions / approval_requests.resolved_by) lives
+    in the DB."""
+    if not verify_superadmin_pin(body.pin):
+        raise HTTPException(status_code=401, detail="PIN 錯誤")
     pool = get_pool()
     row = await pool.fetchrow("SELECT * FROM admins WHERE team_id IS NULL LIMIT 1")
-    if row is None or row["pin_hash"] is None or not verify_pin(body.pin, row["pin_hash"]):
+    if row is None:
         raise HTTPException(status_code=401, detail="PIN 錯誤")
 
     token = await create_session(row["id"])

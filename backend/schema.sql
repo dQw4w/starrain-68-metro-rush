@@ -82,16 +82,20 @@ CREATE TABLE IF NOT EXISTS admins (
     id SERIAL PRIMARY KEY,
     team_id INT REFERENCES teams(id),
     display_name TEXT NOT NULL,
-    -- Super admin (team_id IS NULL) logs in with a PIN. Team admins instead
+    -- Super admin (team_id IS NULL) logs in with a PIN, checked directly
+    -- against the live SUPERADMIN_BOOTSTRAP_PIN env var (see
+    -- auth.verify_superadmin_pin) — never stored here. Team admins instead
     -- get a private, unguessable link (admin_share_token) — no PIN, no login
     -- form; visiting the link grants a session directly.
-    pin_hash TEXT,
     admin_share_token TEXT UNIQUE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-ALTER TABLE admins ALTER COLUMN pin_hash DROP NOT NULL;
 ALTER TABLE admins ADD COLUMN IF NOT EXISTS admin_share_token TEXT UNIQUE;
+-- The super-admin PIN moved to a live env-var check (see above) instead of a
+-- DB hash that only ever got set on first deploy and silently went stale on
+-- every later SUPERADMIN_BOOTSTRAP_PIN change.
+ALTER TABLE admins DROP COLUMN IF EXISTS pin_hash;
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_admins_one_per_team ON admins (team_id) WHERE team_id IS NOT NULL;
 

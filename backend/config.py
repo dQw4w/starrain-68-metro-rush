@@ -5,9 +5,9 @@ load_dotenv()
 
 DATABASE_URL: str = os.environ["DATABASE_URL"]
 
-# Bootstrap PIN for the single super-admin account, seeded on first startup if no
-# super-admin (admins row with team_id IS NULL) exists yet. Change this in .env
-# for anything beyond local testing.
+# PIN for the single super-admin account — checked live on every login
+# attempt (see auth.verify_superadmin_pin), never stored in the DB. Change
+# this and redeploy to change the live PIN immediately.
 SUPERADMIN_BOOTSTRAP_PIN: str = os.environ.get("SUPERADMIN_BOOTSTRAP_PIN", "6868")
 
 SESSION_TTL_HOURS: int = int(os.environ.get("SESSION_TTL_HOURS", "18"))

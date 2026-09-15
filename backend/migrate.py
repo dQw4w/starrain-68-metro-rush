@@ -2,8 +2,6 @@ import secrets
 from pathlib import Path
 from loguru import logger
 from db import get_pool
-from auth import hash_pin
-from config import SUPERADMIN_BOOTSTRAP_PIN
 from seed_stations import seed
 from seed_challenges import seed as seed_challenges
 
@@ -41,6 +39,10 @@ async def _backfill_admin_links() -> None:
 
 
 async def _ensure_superadmin() -> None:
+    """Just an id anchor for sessions / approval_requests.resolved_by — the
+    PIN itself is never stored here (see auth.verify_superadmin_pin), so
+    unlike everything else this function used to do, there's no PIN to keep
+    in sync: SUPERADMIN_BOOTSTRAP_PIN is read live on every login."""
     pool = get_pool()
     async with pool.acquire() as conn:
         existing = await conn.fetchval(
@@ -48,11 +50,7 @@ async def _ensure_superadmin() -> None:
         )
         if existing is None:
             await conn.execute(
-                "INSERT INTO admins (team_id, display_name, pin_hash) VALUES (NULL, $1, $2)",
+                "INSERT INTO admins (team_id, display_name) VALUES (NULL, $1)",
                 "超級管理員",
-                hash_pin(SUPERADMIN_BOOTSTRAP_PIN),
             )
-            logger.warning(
-                f"Seeded super-admin with bootstrap PIN {SUPERADMIN_BOOTSTRAP_PIN!r} "
-                "— change SUPERADMIN_BOOTSTRAP_PIN in .env before a real event."
-            )
+            logger.info("Seeded super-admin row.")

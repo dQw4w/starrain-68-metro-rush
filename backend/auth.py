@@ -1,6 +1,4 @@
-import hashlib
 import hmac
-import os
 import secrets
 import time
 from datetime import datetime, timedelta, timezone
@@ -9,24 +7,16 @@ from typing import Optional
 from fastapi import Depends, Header, HTTPException
 
 from db import get_pool
-from config import SESSION_TTL_HOURS, WS_TICKET_TTL_SECONDS
-
-_PBKDF2_ITERATIONS = 200_000
+from config import SESSION_TTL_HOURS, SUPERADMIN_BOOTSTRAP_PIN, WS_TICKET_TTL_SECONDS
 
 
-def hash_pin(pin: str) -> str:
-    salt = secrets.token_hex(16)
-    digest = hashlib.pbkdf2_hmac("sha256", pin.encode(), bytes.fromhex(salt), _PBKDF2_ITERATIONS)
-    return f"{salt}${digest.hex()}"
-
-
-def verify_pin(pin: str, stored: str) -> bool:
-    try:
-        salt, digest_hex = stored.split("$", 1)
-    except ValueError:
-        return False
-    digest = hashlib.pbkdf2_hmac("sha256", pin.encode(), bytes.fromhex(salt), _PBKDF2_ITERATIONS)
-    return hmac.compare_digest(digest.hex(), digest_hex)
+def verify_superadmin_pin(pin: str) -> bool:
+    """The super-admin PIN is never stored — it's always whatever
+    SUPERADMIN_BOOTSTRAP_PIN currently is in the environment, so changing it
+    (and redeploying) takes effect immediately with no DB migration step and
+    no stale-hash-from-first-deploy trap. Constant-time compare since this is
+    a credential check."""
+    return hmac.compare_digest(pin, SUPERADMIN_BOOTSTRAP_PIN)
 
 
 class AdminIdentity:
