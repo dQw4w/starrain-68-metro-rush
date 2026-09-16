@@ -154,6 +154,12 @@ ALTER TABLE challenges ADD COLUMN IF NOT EXISTS inner_title TEXT NOT NULL DEFAUL
 -- queue in routers/admin.py).
 ALTER TABLE challenges ADD COLUMN IF NOT EXISTS admin_notes TEXT NOT NULL DEFAULT '';
 
+-- Optional second reference photo, for a challenge whose task accepts either
+-- of two options (e.g. either of two characters' merch) — both get shown up
+-- front, same public/teaser visibility as image_url. NULL for every other
+-- challenge.
+ALTER TABLE challenges ADD COLUMN IF NOT EXISTS image_url_2 TEXT;
+
 -- Lets seed_challenges.py upsert by name instead of inserting a fresh
 -- duplicate row every time the seed data changes.
 CREATE UNIQUE INDEX IF NOT EXISTS idx_challenges_name ON challenges (name);

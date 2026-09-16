@@ -28,14 +28,20 @@ TBD = "TBD"
 _CONTENT: dict[str, tuple[str, str]] = {
     "台大二活任務": (
         "台大社團知多少",
-        "限時10分鐘，請上去2活的8-10樓，去看二活有哪些各社辦，可以分工合作分頭行動。"
-        "結束後回到此地，隨隊管理員將會講出7個社團的名字，你們要告訴他二活是否存在該社團的社辦。"
+        "限時10分鐘，請上去2活的8-10樓，去看二活的8-10樓有哪些各社辦，可以分工合作分頭行動。"
+        "結束後回到此地（二活一樓門口），隨隊管理員將會講出7個社團的名字，你們要告訴他二活是否存在該社團的社辦。"
+        "回答時請選一個人做為代表，其他人可以在旁邊幫忙討論，並且告訴他答案。"
         "回答時禁止看手機或是筆記。",
     ),
-    "西門動漫朝聖任務": (
-        "西門聖地巡禮：尋找元氣穗乃果",
-        "高坂穂乃果是本活動主辦人最喜歡的動漫角色之一，西門町是二次元動漫文化的聖地，想必一定有賣她的周邊。"
-        "請找到一個高坂穂乃果的周邊，價格300元（含）以內，把它買下來"
+    "西門町任務": (
+        "西門町任務：致二次元裡獨特的你",
+        "高松燈（來自 BanG Dream! It's MyGO!!!!!）與天王寺璃奈"
+        "（來自《LoveLive! 虹咲學園校園偶像同好會》）都是常被觀眾認為帶有自閉症特質的角色："
+        "前者在語言表達上有困難，且有著特殊的執著與愛好（例如收集石頭）；"
+        "後者則難以透過臉部展現情緒，因此她會用手繪的表情板告訴大家自己現在的心情，"
+        "也曾面臨孤獨、難以交到朋友的處境。"
+        "西門町是二次元動漫文化的聖地，請找到「高松燈」或「天王寺璃奈」任一位角色的周邊，"
+        "價格300元（含）以內，把它買下來"
         "（活動結束後請把周邊轉交給主辦人，主辦人會給你錢）。"
         "周邊可為同人或是官方商品，但周邊上不得出現其他角色的圖案。",
     ),
@@ -85,8 +91,13 @@ _CONTENT: dict[str, tuple[str, str]] = {
 # detail endpoint (see models.py's ChallengeAdminView docstring).
 _ADMIN_NOTES: dict[str, str] = {
     "台大二活任務": (
-        "社團是否存在二活，逐一詢問時對照：社團A(有) 社團B(無) 社團C(無) 社團D(無) "
-        "社團E(有) 社團F(有) 社團G(無)　※ 目前仍是 placeholder，正式上線前請換成真實的7個社團與答案。"
+        "社團是否存在二活，逐一詢問時對照：自閉星雨服務團(有，10F，答錯你就可以退社了) 卡通漫畫研究社(無，社辦在一活)"
+        "臺灣韓國學生交流會(無，只有臺灣日本學生交流會) 熱音社(無，只有椰風搖滾) "
+        "綺巧手工藝社(有，9F) 日本麻雀研究社(有) 登山社(無，社辦在一活)"
+    ),
+    "西門動漫朝聖任務": (
+        "接受「高松燈」或「天王寺璃奈」任一位角色的周邊，兩者皆可判成功；"
+        "確認：商品上沒有其他角色圖案、價格在300元（含）以內。"
     ),
     "葫洲站早午餐任務": "正確店家：ieat早午餐（真極品牛肉麵）。找錯家直接判失敗，只有一次機會。",
     "忠孝敦化街機任務": "正確地點：明曜百貨11樓卡通尼樂園。務必確認機台當下無人在玩，合照才算數。",
@@ -101,8 +112,15 @@ _ADMIN_NOTES: dict[str, str] = {
 # at this exact path by the built SPA.
 _IMAGES: dict[str, str] = {
     "忠孝敦化街機任務": "/challenge-images/ddr-machine.png",
-    "西門動漫朝聖任務": "/challenge-images/kousaka-honoka.png",
+    "西門動漫朝聖任務": "/challenge-images/takamatsu-tomori.png",
     "美麗華摩天輪任務": "/challenge-images/miramar-stairs.png",
+}
+
+# name -> second reference photo (optional). Only 西門動漫朝聖任務 uses this
+# right now — the task accepts merch of either of two characters, so both
+# get shown. See models.py's Challenge.image_url_2 docstring.
+_IMAGES_2: dict[str, str] = {
+    "西門動漫朝聖任務": "/challenge-images/tennoji-rina.png",
 }
 
 # Manual coordinate corrections, keyed by (map-visible) challenge name —
@@ -181,15 +199,16 @@ async def seed(conn) -> None:
         inner_title, description = _CONTENT.get(name, (TBD, TBD))
         lat, lng = _COORD_OVERRIDES.get(name, (lat, lng))
         image_url = _IMAGES.get(name)
+        image_url_2 = _IMAGES_2.get(name)
         admin_notes = _ADMIN_NOTES.get(name, "")
         await conn.execute(
-            """INSERT INTO challenges (name, inner_title, description, type, reward_config, location_name, lat, lng, image_url, admin_notes, pool_state)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+            """INSERT INTO challenges (name, inner_title, description, type, reward_config, location_name, lat, lng, image_url, image_url_2, admin_notes, pool_state)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
                ON CONFLICT (name) DO UPDATE
                SET inner_title = EXCLUDED.inner_title, description = EXCLUDED.description, type = EXCLUDED.type,
                    reward_config = EXCLUDED.reward_config, location_name = EXCLUDED.location_name,
                    lat = EXCLUDED.lat, lng = EXCLUDED.lng, image_url = EXCLUDED.image_url,
-                   admin_notes = EXCLUDED.admin_notes""",
+                   image_url_2 = EXCLUDED.image_url_2, admin_notes = EXCLUDED.admin_notes""",
             name, inner_title, description, ctype, json.dumps(reward_config), location_name, lat, lng, image_url,
-            admin_notes, initial_state,
+            image_url_2, admin_notes, initial_state,
         )

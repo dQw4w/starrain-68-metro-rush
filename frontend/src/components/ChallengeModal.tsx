@@ -102,7 +102,12 @@ export default function ChallengeModal({
         <p className="text-sm text-purple-300 mb-1">{TYPE_LABELS[teaser.type]}</p>
         {teaser.location_name && <p className="text-sm text-white/60 mb-3">📍 {teaser.location_name}</p>}
         {teaser.image_url && (
-          <img src={teaser.image_url} alt="" className="w-full max-h-56 object-cover rounded-xl mb-3" />
+          <div className={`grid gap-2 mb-3 ${teaser.image_url_2 ? 'grid-cols-2' : 'grid-cols-1'}`}>
+            <img src={teaser.image_url} alt="" className="w-full h-40 sm:h-56 object-cover rounded-xl" />
+            {teaser.image_url_2 && (
+              <img src={teaser.image_url_2} alt="" className="w-full h-40 sm:h-56 object-cover rounded-xl" />
+            )}
+          </div>
         )}
         {teaser.prior_fail_count > 0 && (
           <p className="text-sm font-bold text-rose-400 bg-rose-500/10 rounded-lg px-3 py-2 mb-3">

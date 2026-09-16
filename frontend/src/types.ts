@@ -128,6 +128,8 @@ export interface Challenge {
   lat: number | null
   lng: number | null
   image_url: string | null
+  /** Optional second reference photo, for a challenge that accepts either of two options (e.g. either of two characters). */
+  image_url_2: string | null
   pool_state: PoolState
   /** How many teams have already failed this challenge — drives the fail bonus. */
   prior_fail_count: number

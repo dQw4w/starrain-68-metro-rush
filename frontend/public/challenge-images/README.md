@@ -19,9 +19,11 @@ the file you actually drop in.
 
 Currently expected by seed_challenges.py:
 
-- `ddr-machine.png` — 忠孝敦化街機任務 (what a DDR cabinet looks like)
-- `kousaka-honoka.png` — 西門動漫朝聖任務 (高坂穂乃果 reference)
+- `ddr-machine.png` — 忠孝敦化街機任務 (what a DDR cabinet looks like) ✅ already here
+- `takamatsu-tomori.png` — 西門動漫朝聖任務, `image_url` (高松燈 reference)
+- `tennoji-rina.png` — 西門動漫朝聖任務, `image_url_2` (天王寺璃奈 reference —
+  this challenge accepts merch of either character, so both photos show)
 - `miramar-stairs.png` — 美麗華摩天輪任務 (the ground-floor stairway entrance)
 
-None of these files exist yet — add them here, matching these exact names,
-and the next redeploy picks them up automatically.
+Add the missing ones here, matching these exact names, and the next
+redeploy picks them up automatically.

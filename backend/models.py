@@ -263,6 +263,10 @@ class Challenge(BaseModel):
     lat: Optional[float]
     lng: Optional[float]
     image_url: Optional[str]
+    # Optional second reference photo — for a challenge whose task accepts
+    # either of two options (e.g. either of two characters' merch), so both
+    # can be shown up front. None for every other challenge.
+    image_url_2: Optional[str] = None
     pool_state: Literal["queued", "active", "retired"]
     # How many teams have already failed this challenge — drives the fail
     # bonus (see resolve_challenge_start's fail_bonus_pct calculation).
@@ -293,6 +297,7 @@ class ChallengeTeaser(BaseModel):
     lat: Optional[float]
     lng: Optional[float]
     image_url: Optional[str]
+    image_url_2: Optional[str] = None
     pool_state: Literal["queued", "active", "retired"]
     prior_fail_count: int = 0
 
@@ -307,6 +312,7 @@ class ChallengeCreate(BaseModel):
     lat: Optional[float] = None
     lng: Optional[float] = None
     image_url: Optional[str] = None
+    image_url_2: Optional[str] = None
     admin_notes: str = ""
     pool_state: Literal["queued", "active", "retired"] = "queued"
 
@@ -321,6 +327,7 @@ class ChallengeUpdate(BaseModel):
     lat: Optional[float] = None
     lng: Optional[float] = None
     image_url: Optional[str] = None
+    image_url_2: Optional[str] = None
     admin_notes: Optional[str] = None
     pool_state: Optional[Literal["queued", "active", "retired"]] = None
 

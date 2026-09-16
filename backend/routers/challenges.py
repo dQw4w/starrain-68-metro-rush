@@ -77,10 +77,10 @@ async def list_all_challenges(_: AdminIdentity = Depends(require_superadmin)):
 async def create_challenge(body: ChallengeCreate, _: AdminIdentity = Depends(require_superadmin)):
     pool = get_pool()
     row = await pool.fetchrow(
-        """INSERT INTO challenges (name, inner_title, description, type, reward_config, location_name, lat, lng, image_url, admin_notes, pool_state)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *""",
+        """INSERT INTO challenges (name, inner_title, description, type, reward_config, location_name, lat, lng, image_url, image_url_2, admin_notes, pool_state)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *""",
         body.name, body.inner_title, body.description, body.type, json.dumps(body.reward_config), body.location_name,
-        body.lat, body.lng, body.image_url, body.admin_notes, body.pool_state,
+        body.lat, body.lng, body.image_url, body.image_url_2, body.admin_notes, body.pool_state,
     )
     if body.pool_state == "active":
         await manager.broadcast_global("challenge_pool")
