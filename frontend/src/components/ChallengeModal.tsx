@@ -106,7 +106,10 @@ export default function ChallengeModal({
             🔥 已有 {teaser.prior_fail_count} 隊挑戰失敗，本次挑戰獎勵加成 +{bonusPct}%
           </p>
         )}
-        <RewardSummary teaser={teaser} bonusPct={bonusPct} />
+        {/* Call-your-shot (variable) reward text includes unit_label (e.g. "數字", "趟"),
+            which can hint at the task itself — so unlike every other type, it stays
+            hidden until the attempt is approved to start, same gate as description/images. */}
+        {(teaser.type !== 'variable' || fullDetail) && <RewardSummary teaser={teaser} bonusPct={bonusPct} />}
 
         {error && <p className="text-rose-400 text-sm mt-3">{error}</p>}
 

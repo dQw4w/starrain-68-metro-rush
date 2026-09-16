@@ -158,19 +158,14 @@ _COORD_OVERRIDES: dict[str, tuple[float, float]] = {}
 # ever touches anything); the rest start 'queued' and enter play later via
 # activate_initial_pool()/_refill_pool() in game_logic.py.
 _CHALLENGES: list[tuple] = [
-    ("台大二活任務", "multiplier", {"multiplier_pct": 40}, "台大二活門口", 25.0184, 121.5388, "queued"),
+    ("台大二活任務", "multiplier", {"multiplier_pct": 40}, "台大二活門口", 25.012938045228722, 121.53662176506363, "queued"),
     ("西門町任務", "fixed", {"chips": 80}, "西門站5號出口", 25.04286, 121.5088, "active"),
     ("仁愛圓環任務", "variable", {"chips_per_unit": 1, "unit_label": "數字"}, "仁愛圓環", 25.037778, 121.548889, "queued"),
     ("台北地下街任務", "steal", {"steal_pct": 50}, "台北地下街Y1出口", 25.04886, 121.51906, "queued"),
 
-    # Coordinates nudged ~50-90m off the exact station point (葫洲站
-    # 25.072689, 121.607242 / 忠孝敦化站 25.041495, 121.549656) so the
-    # challenge pin doesn't render on top of the station dot on the map;
-    # refine with the superadmin 任務座標 tool once the real spot is
-    # confirmed on the ground.
-    ("葫洲站早午餐任務", "fixed", {"chips": 30}, "葫洲站", 25.071989, 121.607842, "active"),
-    ("美麗華摩天輪任務", "variable", {"chips_per_unit": 50, "unit_label": "趟"}, "美麗華百樂園", 25.0833, 121.5828, "queued"),
-    ("忠孝敦化街機任務", "fixed", {"chips": 40}, "忠孝敦化站", 25.042195, 121.550256, "active"),
+    ("葫洲站早午餐任務", "fixed", {"chips": 30}, "葫洲站", 25.072610389433837, 121.60702478470597, "active"),
+    ("美麗華摩天輪任務", "variable", {"chips_per_unit": 50, "unit_label": "趟"}, "美麗華百樂園", 25.083694238417248, 121.557050674598, "queued"),
+    ("忠孝敦化街機任務", "fixed", {"chips": 40}, "忠孝敦化站", 25.04135165462458, 121.55159815432718, "active"),
 ]
 
 
