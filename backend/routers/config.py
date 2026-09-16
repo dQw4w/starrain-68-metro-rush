@@ -366,8 +366,9 @@ async def reset_game(_: AdminIdentity = Depends(require_superadmin)):
                 "UPDATE station_claims SET owner_team_id = NULL, value = 0, cap = $1, updated_at = now()",
                 cfg["max_deposit_per_visit"],
             )
-            # approval_requests before challenge_attempts: challenge_attempt_id
-            # has no ON DELETE CASCADE, so the referencing side must go first.
+            # Order no longer strictly matters — approval_requests.challenge_attempt_id
+            # is ON DELETE CASCADE now — but deleting the referencing side
+            # first is still the clearer statement of intent.
             await conn.execute("DELETE FROM approval_requests")
             await conn.execute("DELETE FROM challenge_attempts")
             await conn.execute("UPDATE challenges SET pool_state = 'queued'")

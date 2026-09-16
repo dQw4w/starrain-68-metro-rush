@@ -1,9 +1,12 @@
-"""Seeds ~36 placeholder challenges scattered at real Taipei-area landmarks,
-plus a growing set of fully-written real challenges (see _CONTENT below).
+"""Seeds this event's real, fully-written challenges (see _CONTENT below for
+each one's actual title/task text). This file used to also seed ~36
+placeholder landmark challenges with a literal "TBD" description — those
+have been removed entirely (see the DELETE at the end of seed(), which drops
+any challenge no longer listed in _CHALLENGES rather than just hiding it).
 
-Every challenge's `description` defaults to a literal "TBD" placeholder (to
-be written later) but each one already has a real reward and location, so
-the pool is fully playable as-is even before real content is written.
+Every challenge's `description` defaults to a literal "TBD" placeholder if
+it isn't in _CONTENT, so a new entry here is still playable as soon as its
+reward/location are filled in, even before real content is written.
 Exactly 3 start `pool_state='active'` — all `type='fixed'` (constant-value
 reward) per the game's opening-pool rule; the rest start 'queued' and enter
 play later via activate_initial_pool()/_refill_pool() in game_logic.py.
@@ -198,13 +201,13 @@ async def seed(conn) -> None:
         )
 
     # Anything in the DB that's no longer listed above (e.g. the placeholder
-    # landmark challenges this file used to seed) gets retired rather than
-    # deleted — a challenge_attempts/action_log row can already reference it,
-    # so dropping the row outright would violate a foreign key. Retiring
-    # takes it off the map and out of every refill draw (both only look at
-    # pool_state), which is all "removed" needs to mean here.
+    # landmark challenges this file used to seed) is actually deleted, not
+    # just retired — schema.sql points every table that can reference a
+    # challenge (challenge_attempts, approval_requests, action_log) at it
+    # with either ON DELETE CASCADE or SET NULL, so this can't fail on a
+    # dangling reference even if that placeholder was already attempted.
     seeded_names = [name for name, *_ in _CHALLENGES]
     await conn.execute(
-        "UPDATE challenges SET pool_state = 'retired' WHERE pool_state != 'retired' AND NOT (name = ANY($1::text[]))",
+        "DELETE FROM challenges WHERE NOT (name = ANY($1::text[]))",
         seeded_names,
     )

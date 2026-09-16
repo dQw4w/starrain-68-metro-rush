@@ -206,6 +206,18 @@ CREATE TABLE IF NOT EXISTS approval_requests (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- A resolved/stale approval_requests row is disposable workflow history, not
+-- an audit trail (see action_log below for that) — so when a challenge (or
+-- one of its attempts) is actually deleted (see seed_challenges.py's prune),
+-- any request that pointed at it should just go with it instead of blocking
+-- the delete with a dangling-reference error.
+ALTER TABLE approval_requests DROP CONSTRAINT IF EXISTS approval_requests_challenge_id_fkey;
+ALTER TABLE approval_requests ADD CONSTRAINT approval_requests_challenge_id_fkey
+    FOREIGN KEY (challenge_id) REFERENCES challenges(id) ON DELETE CASCADE;
+ALTER TABLE approval_requests DROP CONSTRAINT IF EXISTS approval_requests_challenge_attempt_id_fkey;
+ALTER TABLE approval_requests ADD CONSTRAINT approval_requests_challenge_attempt_id_fkey
+    FOREIGN KEY (challenge_attempt_id) REFERENCES challenge_attempts(id) ON DELETE CASCADE;
+
 CREATE TABLE IF NOT EXISTS action_log (
     id SERIAL PRIMARY KEY,
     team_id INT REFERENCES teams(id),
@@ -224,6 +236,14 @@ CREATE TABLE IF NOT EXISTS action_log (
 -- already queries the whole table rather than filtering by team, so a NULL
 -- row is visible everywhere without special-casing.
 ALTER TABLE action_log ALTER COLUMN team_id DROP NOT NULL;
+
+-- Unlike approval_requests, action_log IS the permanent audit trail — a
+-- deleted challenge should null out the reference here, not take the log
+-- row down with it. The row's `message` already has the challenge's name in
+-- plain text, so the history stays readable either way.
+ALTER TABLE action_log DROP CONSTRAINT IF EXISTS action_log_challenge_id_fkey;
+ALTER TABLE action_log ADD CONSTRAINT action_log_challenge_id_fkey
+    FOREIGN KEY (challenge_id) REFERENCES challenges(id) ON DELETE SET NULL;
 
 CREATE TABLE IF NOT EXISTS device_positions (
     team_id INT NOT NULL REFERENCES teams(id),
