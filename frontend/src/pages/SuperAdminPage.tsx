@@ -11,7 +11,7 @@ import ToastStack, { useToastQueue } from '../components/ToastStack'
 import { usePhase } from '../hooks/usePhase'
 import { useWebSocket, type WsEvent } from '../hooks/useWebSocket'
 import { clearAdminSession, loadAdminSession, saveAdminSession } from '../lib/adminSession'
-import type { ActionLogEntry, Challenge, GameConfig, MapData, Station, StationClaim, TeamAdminView } from '../types'
+import type { ActionLogEntry, Challenge, ChallengeAdminView, GameConfig, MapData, Station, StationClaim, TeamAdminView } from '../types'
 
 type Tab = 'overview' | 'teams' | 'config' | 'challenges' | 'waypoints' | 'log'
 
@@ -22,7 +22,7 @@ export default function SuperAdminPage() {
   const [tab, setTab] = useState<Tab>('overview')
   const [teams, setTeams] = useState<TeamAdminView[]>([])
   const [config, setConfig] = useState<GameConfig | null>(null)
-  const [challenges, setChallenges] = useState<Challenge[]>([])
+  const [challenges, setChallenges] = useState<ChallengeAdminView[]>([])
   const [log, setLog] = useState<ActionLogEntry[]>([])
   const [mapData, setMapData] = useState<MapData | null>(null)
   const [error, setError] = useState('')
@@ -766,11 +766,13 @@ function ChallengesTab({
   onChanged,
   onError,
 }: {
-  challenges: Challenge[]
+  challenges: ChallengeAdminView[]
   token: string
   onChanged: () => void
   onError: (m: string) => void
 }) {
+  const [selected, setSelected] = useState<ChallengeAdminView | null>(null)
+
   async function setPoolState(id: number, pool_state: Challenge['pool_state']) {
     try {
       await api.updateChallenge(token, id, { pool_state })
@@ -817,14 +819,18 @@ function ChallengesTab({
 
       <div className="flex flex-col gap-2">
         {challenges.map((c) => (
-          <div key={c.id} className="bg-white/5 rounded-xl p-3">
+          <div
+            key={c.id}
+            onClick={() => setSelected(c)}
+            className="bg-white/5 hover:bg-white/10 rounded-xl p-3 cursor-pointer transition-colors"
+          >
             <div className="flex justify-between items-baseline">
               <p className="font-bold">{c.name}</p>
               <span className="text-xs text-white/50">{c.pool_state}</span>
             </div>
             {c.inner_title && <p className="text-xs text-amber-300">{c.inner_title}</p>}
             <p className="text-xs text-white/50">{c.type}</p>
-            <div className="flex gap-2 mt-2">
+            <div className="flex gap-2 mt-2" onClick={(e) => e.stopPropagation()}>
               {c.pool_state !== 'active' && (
                 <button onClick={() => setPoolState(c.id, 'active')} className="bg-emerald-600 rounded-lg px-3 py-1 text-xs font-bold">
                   上架
@@ -835,9 +841,82 @@ function ChallengesTab({
                   下架
                 </button>
               )}
+              <span className="text-xs text-white/30 self-center ml-auto">點擊卡片看詳細內容</span>
             </div>
           </div>
         ))}
+      </div>
+
+      {selected && <ChallengeDetailModal challenge={selected} onClose={() => setSelected(null)} />}
+    </div>
+  )
+}
+
+function ChallengeDetailModal({ challenge: c, onClose }: { challenge: ChallengeAdminView; onClose: () => void }) {
+  const rc = c.reward_config
+  const rewardText =
+    c.type === 'fixed'
+      ? `固定獎勵：${rc.chips} 枚代幣`
+      : c.type === 'variable'
+        ? `Call your shot：每 1 個「${rc.unit_label ?? ''}」${rc.chips_per_unit} 枚代幣（獲得代幣數 = 隊伍喊出的數量 × 每單位代幣數）`
+        : c.type === 'steal'
+          ? `偷竊：目標隊伍 ${rc.steal_pct}% 的代幣`
+          : c.type === 'multiplier'
+            ? `倍率：己隊代幣 +${rc.multiplier_pct}%`
+            : JSON.stringify(rc)
+
+  return (
+    <div className="fixed inset-0 z-[2000] flex items-end sm:items-center justify-center bg-black/60 p-0 sm:p-4" onClick={onClose}>
+      <div
+        className="bg-slate-800 text-white rounded-t-2xl sm:rounded-2xl w-full sm:max-w-lg max-h-[85vh] overflow-y-auto p-5"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex justify-between items-start gap-3 mb-3">
+          <div>
+            <h2 className="text-xl font-bold">{c.name}</h2>
+            {c.inner_title && <p className="text-sm text-amber-300 font-medium">{c.inner_title}</p>}
+          </div>
+          <button onClick={onClose} className="text-white/50 text-2xl leading-none shrink-0">
+            &times;
+          </button>
+        </div>
+
+        <div className="flex flex-wrap gap-2 mb-3 text-xs">
+          <span className="bg-white/10 rounded-full px-2.5 py-1">{c.type}</span>
+          <span className="bg-white/10 rounded-full px-2.5 py-1">狀態：{c.pool_state}</span>
+          {c.prior_fail_count > 0 && <span className="bg-rose-500/20 text-rose-300 rounded-full px-2.5 py-1">已有 {c.prior_fail_count} 隊失敗</span>}
+        </div>
+
+        <p className="text-sm mb-1">{rewardText}</p>
+        {c.location_name && <p className="text-sm text-white/60 mb-1">📍 {c.location_name}</p>}
+        {c.lat != null && c.lng != null && (
+          <p className="text-xs text-white/40 font-mono mb-3">
+            {c.lat}, {c.lng}
+          </p>
+        )}
+
+        {(c.image_url || c.image_url_2) && (
+          <div className={`grid gap-2 mb-3 ${c.image_url_2 ? 'grid-cols-2' : 'grid-cols-1'}`}>
+            {c.image_url && (
+              <img src={c.image_url} alt="" className="w-full max-h-56 sm:max-h-72 object-contain bg-black/20 rounded-xl" />
+            )}
+            {c.image_url_2 && (
+              <img src={c.image_url_2} alt="" className="w-full max-h-56 sm:max-h-72 object-contain bg-black/20 rounded-xl" />
+            )}
+          </div>
+        )}
+
+        <p className="text-xs font-bold text-white/50 mb-1">任務敘述</p>
+        <div className="bg-white/5 rounded-xl p-3 text-sm whitespace-pre-wrap mb-3">{c.description || '（尚未撰寫）'}</div>
+
+        {c.admin_notes && (
+          <>
+            <p className="text-xs font-bold text-amber-300/80 mb-1">Admin notes（隊伍看不到）</p>
+            <p className="bg-amber-500/10 border border-amber-400/30 rounded-lg px-3 py-2 text-sm text-amber-200 whitespace-pre-wrap">
+              {c.admin_notes}
+            </p>
+          </>
+        )}
       </div>
     </div>
   )

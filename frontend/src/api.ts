@@ -160,9 +160,9 @@ export const api = {
   lineStationOrder: (token: string) =>
     req<Record<string, LineStationOrderEntry[]>>('/superadmin/line-station-order', { headers: authHeaders(token) }),
 
-  listAllChallenges: (token: string) => req<Challenge[]>('/superadmin/challenges', { headers: authHeaders(token) }),
+  listAllChallenges: (token: string) => req<ChallengeAdminView[]>('/superadmin/challenges', { headers: authHeaders(token) }),
   updateChallenge: (token: string, id: number, body: Partial<Challenge>) =>
-    req<Challenge>(`/superadmin/challenges/${id}`, { method: 'PUT', headers: authHeaders(token), body: JSON.stringify(body) }),
+    req<ChallengeAdminView>(`/superadmin/challenges/${id}`, { method: 'PUT', headers: authHeaders(token), body: JSON.stringify(body) }),
   activatePool: (token: string) =>
     req<any>('/superadmin/challenges/activate-pool', { method: 'POST', headers: authHeaders(token) }),
   activateAllChallenges: (token: string) =>
