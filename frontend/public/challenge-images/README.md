@@ -5,9 +5,9 @@ challenge's `image_url` in `backend/seed_challenges.py` at `/challenge-images/<f
 
 This folder is Vite's `public/` dir, so anything here is copied verbatim into
 the build output and served at that exact path — no code changes needed
-beyond the `image_url` string. `image_url` is a public/teaser field (visible
-on the map before a team even starts the challenge, alongside `name` and
-`location_name`), so **never put a spoiler image here** — a photo of what
+beyond the `image_url` string. `image_url` is hidden until a team's attempt
+is approved to start — it's shown alongside the task description, not on
+the map pin/teaser — so **never put a spoiler image here** — a photo of what
 you're looking for (a DDR machine, a character) is fine; a photo of the
 actual venue/answer is not.
 
@@ -20,8 +20,8 @@ the file you actually drop in.
 Currently expected by seed_challenges.py:
 
 - `ddr-machine.png` — 忠孝敦化街機任務 (what a DDR cabinet looks like) ✅ already here
-- `takamatsu-tomori.png` — 西門動漫朝聖任務, `image_url` (高松燈 reference)
-- `tennoji-rina.png` — 西門動漫朝聖任務, `image_url_2` (天王寺璃奈 reference —
+- `takamatsu-tomori.png` — 西門町任務, `image_url` (高松燈 reference)
+- `tennoji-rina.png` — 西門町任務, `image_url_2` (天王寺璃奈 reference —
   this challenge accepts merch of either character, so both photos show)
 - `miramar-stairs.png` — 美麗華摩天輪任務 (the ground-floor stairway entrance)
 

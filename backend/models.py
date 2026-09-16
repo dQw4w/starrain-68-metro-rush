@@ -262,10 +262,14 @@ class Challenge(BaseModel):
     location_name: Optional[str]
     lat: Optional[float]
     lng: Optional[float]
+    # Reference photo(s) — hidden from the map/teaser same as inner_title and
+    # description above (never in ChallengeTeaser), so they only reach a team
+    # once their attempt is approved to start, shown alongside the
+    # description rather than as a spoiler-free preview. image_url_2 is an
+    # optional second photo, for a challenge whose task accepts either of two
+    # options (e.g. either of two characters' merch); None for every other
+    # challenge.
     image_url: Optional[str]
-    # Optional second reference photo — for a challenge whose task accepts
-    # either of two options (e.g. either of two characters' merch), so both
-    # can be shown up front. None for every other challenge.
     image_url_2: Optional[str] = None
     pool_state: Literal["queued", "active", "retired"]
     # How many teams have already failed this challenge — drives the fail
@@ -288,7 +292,10 @@ class ChallengeAdminView(Challenge):
 class ChallengeTeaser(BaseModel):
     """Public listing shape: location + reward are known upfront, but the task
     description itself stays hidden until a team's admin approves the start
-    (rule: description pops up on the team's screens only after approval)."""
+    (rule: description pops up on the team's screens only after approval).
+    Reference photos stay hidden until then too — they go with the
+    description, not the map pin — so image_url/image_url_2 live only on the
+    full Challenge model below, never here."""
     id: int
     name: str
     type: Literal["fixed", "variable", "steal", "multiplier"]
@@ -296,8 +303,6 @@ class ChallengeTeaser(BaseModel):
     location_name: Optional[str]
     lat: Optional[float]
     lng: Optional[float]
-    image_url: Optional[str]
-    image_url_2: Optional[str] = None
     pool_state: Literal["queued", "active", "retired"]
     prior_fail_count: int = 0
 

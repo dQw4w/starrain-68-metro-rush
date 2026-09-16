@@ -101,14 +101,6 @@ export default function ChallengeModal({
         </div>
         <p className="text-sm text-purple-300 mb-1">{TYPE_LABELS[teaser.type]}</p>
         {teaser.location_name && <p className="text-sm text-white/60 mb-3">📍 {teaser.location_name}</p>}
-        {teaser.image_url && (
-          <div className={`grid gap-2 mb-3 ${teaser.image_url_2 ? 'grid-cols-2' : 'grid-cols-1'}`}>
-            <img src={teaser.image_url} alt="" className="w-full h-40 sm:h-56 object-cover rounded-xl" />
-            {teaser.image_url_2 && (
-              <img src={teaser.image_url_2} alt="" className="w-full h-40 sm:h-56 object-cover rounded-xl" />
-            )}
-          </div>
-        )}
         {teaser.prior_fail_count > 0 && (
           <p className="text-sm font-bold text-rose-400 bg-rose-500/10 rounded-lg px-3 py-2 mb-3">
             🔥 已有 {teaser.prior_fail_count} 隊挑戰失敗，本次挑戰獎勵加成 +{bonusPct}%
@@ -153,6 +145,22 @@ export default function ChallengeModal({
 
         {attempt && attempt.status === 'in_progress' && (
           <div className="mt-4 flex flex-col gap-3">
+            {fullDetail && fullDetail.image_url && (
+              <div className={`grid gap-2 ${fullDetail.image_url_2 ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                <img
+                  src={fullDetail.image_url}
+                  alt=""
+                  className="w-full max-h-56 sm:max-h-72 object-contain bg-black/20 rounded-xl"
+                />
+                {fullDetail.image_url_2 && (
+                  <img
+                    src={fullDetail.image_url_2}
+                    alt=""
+                    className="w-full max-h-56 sm:max-h-72 object-contain bg-black/20 rounded-xl"
+                  />
+                )}
+              </div>
+            )}
             <div className="bg-white/5 rounded-xl p-3 text-sm whitespace-pre-wrap">
               {fullDetail ? fullDetail.description : '任務內容載入中…'}
             </div>

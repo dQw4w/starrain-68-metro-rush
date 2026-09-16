@@ -135,8 +135,8 @@ export interface Challenge {
   prior_fail_count: number
 }
 
-/** Public listing shape: no `inner_title`/`description` — hidden until a team's admin approves the start. */
-export type ChallengeTeaser = Omit<Challenge, 'inner_title' | 'description'>
+/** Public listing shape: no `inner_title`/`description`/`image_url`/`image_url_2` — hidden until a team's admin approves the start. */
+export type ChallengeTeaser = Omit<Challenge, 'inner_title' | 'description' | 'image_url' | 'image_url_2'>
 
 /** Challenge plus the answer key/judging notes — admin-authenticated reads only
  * (superadmin CRUD, and the team-admin's judging queue). Never sent to a team. */

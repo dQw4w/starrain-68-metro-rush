@@ -113,7 +113,7 @@ _ADMIN_NOTES: dict[str, str] = {
         "* * * * * * * * * *\n"
         "91 92 93 94 95 * 97 * 99 100"
     ),
-    "西門動漫朝聖任務": (
+    "西門町任務": (
         "接受「高松燈」或「天王寺璃奈」任一位角色的周邊，兩者皆可判成功；"
         "確認：商品上沒有其他角色圖案、價格在300元（含）以內。"
     ),
@@ -122,23 +122,23 @@ _ADMIN_NOTES: dict[str, str] = {
     "台北地下街任務": "正確答案：825公尺。誤差在100公尺（含）以內都算成功。",
 }
 
-# name -> image_url. A reference photo shown alongside the challenge's public
-# teaser (visible on the map before a team even starts it — see
-# ChallengeTeaser in frontend/src/types.ts) — so it must show what to look
-# for (a DDR cabinet, a character), never the actual venue/answer. Files live
-# in frontend/public/challenge-images/ (see the README there) and are served
-# at this exact path by the built SPA.
+# name -> image_url. A reference photo shown alongside the task description —
+# hidden until a team's attempt is approved to start, same as description
+# itself (see ChallengeTeaser vs. Challenge in models.py) — so it must show
+# what to look for (a DDR cabinet, a character), never the actual
+# venue/answer. Files live in frontend/public/challenge-images/ (see the
+# README there) and are served at this exact path by the built SPA.
 _IMAGES: dict[str, str] = {
     "忠孝敦化街機任務": "/challenge-images/ddr-machine.png",
-    "西門動漫朝聖任務": "/challenge-images/takamatsu-tomori.png",
+    "西門町任務": "/challenge-images/takamatsu-tomori.png",
     "美麗華摩天輪任務": "/challenge-images/miramar-stairs.png",
 }
 
-# name -> second reference photo (optional). Only 西門動漫朝聖任務 uses this
+# name -> second reference photo (optional). Only 西門町任務 uses this
 # right now — the task accepts merch of either of two characters, so both
 # get shown. See models.py's Challenge.image_url_2 docstring.
 _IMAGES_2: dict[str, str] = {
-    "西門動漫朝聖任務": "/challenge-images/tennoji-rina.png",
+    "西門町任務": "/challenge-images/tennoji-rina.png",
 }
 
 # Manual coordinate corrections, keyed by (map-visible) challenge name —
@@ -159,8 +159,8 @@ _COORD_OVERRIDES: dict[str, tuple[float, float]] = {}
 # activate_initial_pool()/_refill_pool() in game_logic.py.
 _CHALLENGES: list[tuple] = [
     ("台大二活任務", "multiplier", {"multiplier_pct": 40}, "台大二活門口", 25.0184, 121.5388, "queued"),
-    ("西門動漫朝聖任務", "fixed", {"chips": 80}, "西門站5號出口", 25.0424, 121.5077, "active"),
-    ("仁愛圓環任務", "variable", {"chips_per_unit": 1, "unit_label": "數字"}, "仁愛圓環", 25.0216, 121.3256, "queued"),
+    ("西門町任務", "fixed", {"chips": 80}, "西門站5號出口", 25.04286, 121.5088, "active"),
+    ("仁愛圓環任務", "variable", {"chips_per_unit": 1, "unit_label": "數字"}, "仁愛圓環", 25.037778, 121.548889, "queued"),
     ("台北地下街任務", "steal", {"steal_pct": 50}, "台北地下街Y1出口", 25.0526, 121.5203, "queued"),
 
     # Coordinates nudged ~50-90m off the exact station point (葫洲站
