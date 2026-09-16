@@ -765,6 +765,23 @@ async def activate_initial_pool() -> None:
     await manager.broadcast_global("challenge_pool")
 
 
+async def activate_all_challenges() -> None:
+    """Superadmin override: puts every still-queued challenge onto the map at
+    once, ignoring the usual gradual-reveal rules (opening-pool fixed-only,
+    refill batch size, challenge_pool_max) — for a small event where holding
+    challenges back in a backlog isn't wanted. Never touches an already
+    active/retired challenge."""
+    pool = get_pool()
+    async with pool.acquire() as conn:
+        async with conn.transaction():
+            rows = await conn.fetch("SELECT id, name FROM challenges WHERE pool_state = 'queued'")
+            for row in rows:
+                await conn.execute("UPDATE challenges SET pool_state = 'active' WHERE id = $1", row["id"])
+                await log_challenge_published(conn, row["id"], row["name"])
+    if rows:
+        await manager.broadcast_global("challenge_pool")
+
+
 # ---------------------------------------------------------------------------
 # End-of-game sweep for attempts left dangling when the clock runs out
 # ---------------------------------------------------------------------------

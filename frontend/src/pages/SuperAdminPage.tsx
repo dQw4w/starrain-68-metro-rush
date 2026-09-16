@@ -782,19 +782,35 @@ function ChallengesTab({
 
   return (
     <div className="flex flex-col gap-4 max-w-xl">
-      <button
-        onClick={async () => {
-          try {
-            await api.activatePool(token)
-            onChanged()
-          } catch (e: any) {
-            onError(e.message || '啟動任務池失敗')
-          }
-        }}
-        className="bg-purple-600 rounded-lg py-2 font-bold text-sm self-start px-4"
-      >
-        啟動初始任務池
-      </button>
+      <div className="flex flex-wrap gap-2">
+        <button
+          onClick={async () => {
+            try {
+              await api.activatePool(token)
+              onChanged()
+            } catch (e: any) {
+              onError(e.message || '啟動任務池失敗')
+            }
+          }}
+          className="bg-purple-600 rounded-lg py-2 font-bold text-sm px-4"
+        >
+          啟動初始任務池
+        </button>
+        <button
+          onClick={async () => {
+            if (!window.confirm('確定要把所有待命中的任務一次全部上架嗎？')) return
+            try {
+              await api.activateAllChallenges(token)
+              onChanged()
+            } catch (e: any) {
+              onError(e.message || '上架所有任務失敗')
+            }
+          }}
+          className="bg-amber-600 rounded-lg py-2 font-bold text-sm px-4"
+        >
+          上架所有任務
+        </button>
+      </div>
       <p className="text-xs text-white/40">
         新增任務請直接編輯 backend/seed_challenges.py 並重新部署；這裡只能調整已存在任務的上架/下架狀態。
       </p>

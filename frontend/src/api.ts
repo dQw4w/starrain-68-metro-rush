@@ -165,6 +165,8 @@ export const api = {
     req<Challenge>(`/superadmin/challenges/${id}`, { method: 'PUT', headers: authHeaders(token), body: JSON.stringify(body) }),
   activatePool: (token: string) =>
     req<any>('/superadmin/challenges/activate-pool', { method: 'POST', headers: authHeaders(token) }),
+  activateAllChallenges: (token: string) =>
+    req<any>('/superadmin/challenges/activate-all', { method: 'POST', headers: authHeaders(token) }),
 }
 
 interface TeamPublicWithPending {

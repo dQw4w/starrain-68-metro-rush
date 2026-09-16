@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from auth import AdminIdentity, require_superadmin
 from db import get_pool
 from models import Challenge, ChallengeAdminView, ChallengeTeaser, ChallengeUpdate
-from game_logic import activate_initial_pool, log_challenge_published
+from game_logic import activate_all_challenges, activate_initial_pool, log_challenge_published
 from ws import manager
 
 router = APIRouter(tags=["challenges"])
@@ -107,4 +107,10 @@ async def update_challenge(challenge_id: int, body: ChallengeUpdate, _: AdminIde
 @router.post("/api/superadmin/challenges/activate-pool")
 async def activate_pool(_: AdminIdentity = Depends(require_superadmin)):
     await activate_initial_pool()
+    return {"ok": True}
+
+
+@router.post("/api/superadmin/challenges/activate-all")
+async def activate_all(_: AdminIdentity = Depends(require_superadmin)):
+    await activate_all_challenges()
     return {"ok": True}
