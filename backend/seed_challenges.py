@@ -161,7 +161,7 @@ _CHALLENGES: list[tuple] = [
     ("台大二活任務", "multiplier", {"multiplier_pct": 40}, "台大二活門口", 25.0184, 121.5388, "queued"),
     ("西門町任務", "fixed", {"chips": 80}, "西門站5號出口", 25.04286, 121.5088, "active"),
     ("仁愛圓環任務", "variable", {"chips_per_unit": 1, "unit_label": "數字"}, "仁愛圓環", 25.037778, 121.548889, "queued"),
-    ("台北地下街任務", "steal", {"steal_pct": 50}, "台北地下街Y1出口", 25.0526, 121.5203, "queued"),
+    ("台北地下街任務", "steal", {"steal_pct": 50}, "台北地下街Y1出口", 25.04886, 121.51906, "queued"),
 
     # Coordinates nudged ~50-90m off the exact station point (葫洲站
     # 25.072689, 121.607242 / 忠孝敦化站 25.041495, 121.549656) so the
