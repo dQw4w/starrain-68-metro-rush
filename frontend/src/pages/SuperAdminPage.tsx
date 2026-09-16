@@ -771,53 +771,6 @@ function ChallengesTab({
   onChanged: () => void
   onError: (m: string) => void
 }) {
-  const [name, setName] = useState('')
-  const [innerTitle, setInnerTitle] = useState('')
-  const [description, setDescription] = useState('')
-  const [type, setType] = useState<Challenge['type']>('fixed')
-  const [locationName, setLocationName] = useState('')
-  const [lat, setLat] = useState('')
-  const [lng, setLng] = useState('')
-  const [rewardValue, setRewardValue] = useState('')
-  const [busy, setBusy] = useState(false)
-
-  const rewardConfig = () => {
-    if (type === 'fixed') return { chips: Number(rewardValue) }
-    if (type === 'variable') return { chips_per_unit: Number(rewardValue), unit_label: '單位' }
-    if (type === 'steal') return { steal_pct: Number(rewardValue) }
-    return { multiplier_pct: Number(rewardValue) }
-  }
-
-  async function createChallenge(e: React.FormEvent) {
-    e.preventDefault()
-    setBusy(true)
-    try {
-      await api.createChallenge(token, {
-        name,
-        inner_title: innerTitle,
-        description,
-        type,
-        reward_config: rewardConfig(),
-        location_name: locationName || undefined,
-        lat: lat ? Number(lat) : undefined,
-        lng: lng ? Number(lng) : undefined,
-        pool_state: 'queued',
-      })
-      setName('')
-      setInnerTitle('')
-      setDescription('')
-      setLocationName('')
-      setLat('')
-      setLng('')
-      setRewardValue('')
-      onChanged()
-    } catch (e: any) {
-      onError(e.message || '新增任務失敗')
-    } finally {
-      setBusy(false)
-    }
-  }
-
   async function setPoolState(id: number, pool_state: Challenge['pool_state']) {
     try {
       await api.updateChallenge(token, id, { pool_state })
@@ -842,6 +795,9 @@ function ChallengesTab({
       >
         啟動初始任務池
       </button>
+      <p className="text-xs text-white/40">
+        新增任務請直接編輯 backend/seed_challenges.py 並重新部署；這裡只能調整已存在任務的上架/下架狀態。
+      </p>
 
       <div className="flex flex-col gap-2">
         {challenges.map((c) => (
@@ -867,52 +823,6 @@ function ChallengesTab({
           </div>
         ))}
       </div>
-
-      <form onSubmit={createChallenge} className="bg-white/5 rounded-xl p-3 flex flex-col gap-2">
-        <p className="font-bold text-sm">新增任務</p>
-        <input
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="地圖顯示名稱（僅地點提示，如：饒河街任務）"
-          required
-          className="bg-white/10 rounded-lg px-3 py-2 text-sm"
-        />
-        <input
-          value={innerTitle}
-          onChange={(e) => setInnerTitle(e.target.value)}
-          placeholder="任務內部標題（核准開始後才顯示給隊伍）"
-          className="bg-white/10 rounded-lg px-3 py-2 text-sm"
-        />
-        <textarea
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          placeholder="任務敘述（核准開始後才會顯示給隊伍）"
-          required
-          className="bg-white/10 rounded-lg px-3 py-2 text-sm"
-        />
-        <select value={type} onChange={(e) => setType(e.target.value as Challenge['type'])} className="bg-white/10 rounded-lg px-3 py-2 text-sm">
-          <option value="fixed">固定獎勵</option>
-          <option value="variable">Call your shot</option>
-          <option value="steal">偷竊</option>
-          <option value="multiplier">倍率</option>
-        </select>
-        <input
-          value={rewardValue}
-          onChange={(e) => setRewardValue(e.target.value)}
-          placeholder={type === 'fixed' ? '固定代幣數' : type === 'variable' ? '每單位代幣數' : type === 'steal' ? '偷竊百分比' : '倍率百分比'}
-          type="number"
-          required
-          className="bg-white/10 rounded-lg px-3 py-2 text-sm"
-        />
-        <input value={locationName} onChange={(e) => setLocationName(e.target.value)} placeholder="地點名稱" className="bg-white/10 rounded-lg px-3 py-2 text-sm" />
-        <div className="flex gap-2">
-          <input value={lat} onChange={(e) => setLat(e.target.value)} placeholder="緯度" className="flex-1 bg-white/10 rounded-lg px-3 py-2 text-sm" />
-          <input value={lng} onChange={(e) => setLng(e.target.value)} placeholder="經度" className="flex-1 bg-white/10 rounded-lg px-3 py-2 text-sm" />
-        </div>
-        <button disabled={busy} className="bg-emerald-600 disabled:opacity-40 rounded-lg py-2 font-bold text-sm">
-          新增任務（加入待命池）
-        </button>
-      </form>
     </div>
   )
 }

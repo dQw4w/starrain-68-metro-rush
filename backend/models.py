@@ -302,21 +302,6 @@ class ChallengeTeaser(BaseModel):
     prior_fail_count: int = 0
 
 
-class ChallengeCreate(BaseModel):
-    name: str
-    inner_title: str = ""
-    description: str
-    type: Literal["fixed", "variable", "steal", "multiplier"]
-    reward_config: RewardConfig
-    location_name: Optional[str] = None
-    lat: Optional[float] = None
-    lng: Optional[float] = None
-    image_url: Optional[str] = None
-    image_url_2: Optional[str] = None
-    admin_notes: str = ""
-    pool_state: Literal["queued", "active", "retired"] = "queued"
-
-
 class ChallengeUpdate(BaseModel):
     name: Optional[str] = None
     inner_title: Optional[str] = None

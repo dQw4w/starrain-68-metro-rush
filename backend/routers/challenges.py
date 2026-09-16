@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from auth import AdminIdentity, require_superadmin
 from db import get_pool
-from models import Challenge, ChallengeAdminView, ChallengeCreate, ChallengeTeaser, ChallengeUpdate
+from models import Challenge, ChallengeAdminView, ChallengeTeaser, ChallengeUpdate
 from game_logic import activate_initial_pool, log_challenge_published
 from ws import manager
 
@@ -73,21 +73,12 @@ async def list_all_challenges(_: AdminIdentity = Depends(require_superadmin)):
     return [to_challenge_admin(r) for r in rows]
 
 
-@router.post("/api/superadmin/challenges", response_model=ChallengeAdminView)
-async def create_challenge(body: ChallengeCreate, _: AdminIdentity = Depends(require_superadmin)):
-    pool = get_pool()
-    row = await pool.fetchrow(
-        """INSERT INTO challenges (name, inner_title, description, type, reward_config, location_name, lat, lng, image_url, image_url_2, admin_notes, pool_state)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *""",
-        body.name, body.inner_title, body.description, body.type, json.dumps(body.reward_config), body.location_name,
-        body.lat, body.lng, body.image_url, body.image_url_2, body.admin_notes, body.pool_state,
-    )
-    if body.pool_state == "active":
-        await manager.broadcast_global("challenge_pool")
-        await log_challenge_published(pool, row["id"], row["name"])
-    return to_challenge_admin(row)
-
-
+# No POST/create endpoint: new challenges are authored in seed_challenges.py
+# (_CONTENT/_ADMIN_NOTES/_IMAGES/_CHALLENGES) and land via the next deploy's
+# migration — that keeps every challenge's real content, answer key, and
+# location in version control instead of only in the live DB. Editing an
+# existing one (pool_state, coordinates via the 任務座標 tool, etc.) still
+# goes through PUT below.
 @router.put("/api/superadmin/challenges/{challenge_id}", response_model=ChallengeAdminView)
 async def update_challenge(challenge_id: int, body: ChallengeUpdate, _: AdminIdentity = Depends(require_superadmin)):
     pool = get_pool()
