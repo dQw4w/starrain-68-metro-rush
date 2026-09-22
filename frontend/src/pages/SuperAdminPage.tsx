@@ -5,6 +5,7 @@ import ActionLogList from '../components/ActionLogList'
 import GameClock from '../components/GameClock'
 import ChallengeCoordEditor from '../components/ChallengeCoordEditor'
 import LineWaypointEditor from '../components/LineWaypointEditor'
+import MetroMap from '../components/MetroMap'
 import RankingBoard from '../components/RankingBoard'
 import StationCoordEditor from '../components/StationCoordEditor'
 import ToastStack, { useToastQueue } from '../components/ToastStack'
@@ -148,6 +149,8 @@ export default function SuperAdminPage() {
             token={token}
             onChanged={refresh}
             onError={(m) => setError(m)}
+            mapData={mapData}
+            teams={teams}
           />
         )}
 
@@ -765,13 +768,22 @@ function ChallengesTab({
   token,
   onChanged,
   onError,
+  mapData,
+  teams,
 }: {
   challenges: ChallengeAdminView[]
   token: string
   onChanged: () => void
   onError: (m: string) => void
+  mapData: MapData | null
+  teams: TeamAdminView[]
 }) {
   const [selected, setSelected] = useState<ChallengeAdminView | null>(null)
+  // The list below shows every challenge regardless of pool_state; the map
+  // pins are identical whatever that state is, so an unfiltered map would
+  // make a retired challenge look live. Default to just the active ones.
+  const [mapFilter, setMapFilter] = useState<'active' | 'all'>('active')
+  const mapChallenges = mapFilter === 'all' ? challenges : challenges.filter((c) => c.pool_state === 'active')
 
   async function setPoolState(id: number, pool_state: Challenge['pool_state']) {
     try {
@@ -783,7 +795,7 @@ function ChallengesTab({
   }
 
   return (
-    <div className="flex flex-col gap-4 max-w-xl">
+    <div className="flex flex-col gap-4 max-w-3xl">
       <div className="flex flex-wrap gap-2">
         <button
           onClick={async () => {
@@ -816,6 +828,32 @@ function ChallengesTab({
       <p className="text-xs text-white/40">
         新增任務請直接編輯 backend/seed_challenges.py 並重新部署；這裡只能調整已存在任務的上架/下架狀態。
       </p>
+
+      {mapData && (
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-white/50">地圖顯示：</span>
+            {(['active', 'all'] as const).map((f) => (
+              <button
+                key={f}
+                onClick={() => setMapFilter(f)}
+                className={`text-xs font-bold rounded-lg px-2.5 py-1 ${mapFilter === f ? 'bg-blue-600' : 'bg-white/10'}`}
+              >
+                {f === 'active' ? '僅上架中' : '全部任務'}
+              </button>
+            ))}
+            <span className="text-xs text-white/30 ml-auto">{mapChallenges.length} 個任務・點圖釘看詳細內容</span>
+          </div>
+          <div className="h-[45vh] min-h-[280px] rounded-xl overflow-hidden">
+            <MetroMap
+              mapData={mapData}
+              teams={teams}
+              challenges={mapChallenges}
+              onChallengeClick={(ch) => setSelected(challenges.find((c) => c.id === ch.id) ?? null)}
+            />
+          </div>
+        </div>
+      )}
 
       <div className="flex flex-col gap-2">
         {challenges.map((c) => (
