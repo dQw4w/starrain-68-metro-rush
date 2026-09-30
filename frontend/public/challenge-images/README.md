@@ -24,6 +24,14 @@ Currently expected by seed_challenges.py:
 - `tennoji-rina.png` — 西門町任務, `image_url_2` (天王寺璃奈 reference —
   this challenge accepts merch of either character, so both photos show)
 - `miramar-stairs.png` — 美麗華任務 (the ground-floor stairway entrance)
+- `morse-code.png` — 南港區民活動中心任務 (the Morse code reference chart —
+  this one is task material, not just a hint: the team decodes against it)
+- `matra-train.png` — 木柵機廠任務, `image_url` (馬特拉列車)
+- `bombardier-train.png` — 木柵機廠任務, `image_url_2` (龐巴迪列車)
+
+The 木柵機廠 description says 左圖 = 馬特拉 and 右圖 = 龐巴迪, and the modal
+renders `image_url` on the left, `image_url_2` on the right — so those two
+can't be swapped without rewriting the description.
 
 Add the missing ones here, matching these exact names, and the next
 redeploy picks them up automatically.

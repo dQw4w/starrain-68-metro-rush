@@ -88,9 +88,48 @@ _CONTENT: dict[str, tuple[str, str]] = {
         "東區裡的舞步傳說",
         "如圖，Dance Dance Revolution，是二十幾年前曾經風靡全球的跳舞街機遊戲，時至今日，此遊戲雖然風光不如以往，"
         "但仍有許多忠實熱忱的玩家，也有一些把這個遊戲當成運動或拿來減肥的玩家。台北市內還有數個地方有這個機台，"
-        "其中一台就藏身在東區裡面，請找到他並且在機台的前面拍合照！"
-        "但請注意，大部分的玩家都不喜歡別人未經同意就拍照，所以你們必須等機台沒有人在遊玩的時候才能拍照，"
-        "否則就先乖乖欣賞玩家的舞步吧！",
+        "而明曜百貨11樓就是其中之一。"
+        "現在，請跟你的隨隊人員要6枚代幣，並實際遊玩此機台；如果有人在排隊，請照規矩排隊等候。"
+        "遊玩一次總共是3首歌，前2首是練習，第3首才是正式的任務挑戰。"
+        "你們必須在第3首歌開始之前宣告自己欲挑戰的等級（數字），"
+        "並且選擇的歌曲曲名中必須含有「星」、「雨」、「star」或「rain」（英文大小寫不拘）。"
+        "如果過關，可獲得「挑戰等級×5」的代幣；如果選錯歌曲或是沒有過關，則任務失敗。",
+    ),
+    "松山機場任務": (
+        "看別人出國的下午",
+        "大家應該都很想搭飛機出國玩吧！但很可惜，我們社遊沒有經費讓你們出國，"
+        "但至少可以來松山機場欣賞別人出國。"
+        "現在，請一個人拿手機，錄下一架飛機完整的起飛過程。"
+        "錄下的影片必須至少包含：飛機在地上行走3秒鐘、飛機離地的瞬間，"
+        "以及飛機在畫面上的高度超過視野前方的山脈。",
+    ),
+    "木柵機廠任務": (
+        "猜猜下一班回家的是誰",
+        "歡迎來到木柵機廠，這裡是文湖線捷運列車的其中一個家。"
+        "現行文湖線營運中的列車共有兩種車型，分別是左圖的馬特拉列車（車號是2位數），"
+        "以及右圖的龐巴迪列車（車號是3位數）。"
+        "現在，請猜測下一列入庫／出庫的列車的車型，猜測必須在任何列車有動靜之前做出才算。"
+        "如果失敗了可以等再猜下一列車的車型，直到成功為止。",
+    ),
+    "辛亥國小任務": (
+        "七成的罰球線",
+        "辛亥國小是少數擁有室外風雨籃球場的國小，並且假日開放一般民眾入場打球。"
+        "我們沒辦法攜帶籃球給各位投籃，但你們可以用乒乓球投。"
+        "台灣職業籃球聯盟的平均罰球命中率大概在70%左右，如果你們也能夠達成相同命中率的話，"
+        "或許就可以當職籃球員了！"
+        "請小組組員決定順序，並依此順序輪流在任意籃筐的罰球線投乒乓球，總共會投10球，"
+        "如果進了7球就算任務成功，進不到7球就任務失敗。"
+        "在宣告開始挑戰之前，你們可以自由練習並討論順序的策略。",
+    ),
+    "南港區民活動中心任務": (
+        "嗶——嗶嗶嗶——",
+        "歡迎來到南港區民活動中心，這裡是星雨上一期青假早上認識活動以及教案的進行場地。"
+        "其中，教案組設計的其中一個活動就是摩斯密碼。"
+        "現在，小隊請分成人數相同（或是最多差1個人）的兩組，一組負責發出訊號，一組負責接收訊號並解碼。"
+        "發訊號的方式只能使用嘴巴發出長短的「嗶……」聲，不能發出其他聲音，也不能做出任何手勢或動作。"
+        "題目是一個英文單字，請參照上方的對照表來進行訊號發送／解密。"
+        "在你們準備好後，隨隊人員會給發出訊號組的看題目，結束後解密組必須完整地將題目的單字拼出，"
+        "如果差一個字母就任務失敗。",
     ),
 }
 
@@ -127,7 +166,38 @@ _ADMIN_NOTES: dict[str, str] = {
         "確認：商品上沒有其他角色圖案、價格在300元（含）以內。"
     ),
     "葫洲站任務": "正確店家：ieat早午餐（真極品牛肉麵）。找錯家直接判失敗，只有一次機會。",
-    "忠孝敦化任務": "正確地點：明曜百貨11樓卡通尼樂園。務必確認機台當下無人在玩，合照才算數。",
+    "忠孝敦化任務": (
+        "地點：明曜百貨11樓卡通尼樂園。開始前發6枚代幣給隊伍。\n"
+        "並沒有限制只能一個人玩，可以多人合作、一人負責一個踏板。\n"
+        "判斷過關：第3首歌結束後畫面顯示「STAGE CLEARED」，且評等不是 E 等。\n"
+        "判斷失敗：畫面顯示「STAGE FAILED」，或評等為 E 等。\n"
+        "另外確認曲名含有「星」「雨」「star」或「rain」（大小寫不拘），選錯歌直接失敗。"
+    ),
+    # The judging admin's approval card shows admin_notes but NOT the task
+    # description, so for a checklist-style judgment the criteria have to be
+    # repeated here or the admin has nothing to check against.
+    "松山機場任務": (
+        "看影片逐項確認，三項都要有才算成功：\n"
+        "1. 飛機在地上行走至少3秒鐘\n"
+        "2. 飛機離地的瞬間\n"
+        "3. 飛機在畫面上的高度超過視野前方的山脈"
+    ),
+    "木柵機廠任務": (
+        "入庫的定義：整部列車完整的進入車庫。\n"
+        "出庫的定義：整部列車完整駛出車庫。\n"
+        "如果同時發生，則請比較完整駛出／駛入的時間點來判斷。\n"
+        "車型辨識：馬特拉車號2位數、龐巴迪車號3位數。\n"
+        "猜錯可以繼續等下一列車再猜，直到猜中為止（不會因為猜錯就直接失敗）。"
+    ),
+    "辛亥國小任務": (
+        "共投10球，進7球（含）以上算成功，未達7球失敗。\n"
+        "必須依隊伍事先宣告的順序輪流投；宣告開始挑戰後就不能再練習。"
+    ),
+    "南港區民活動中心任務": (
+        "題目單字：asperger（請只給發訊號組看，不要讓解碼組看到）。\n"
+        "解碼組必須完整拼出 asperger，差一個字母就算失敗。\n"
+        "過程中發訊號組只能用嘴巴發出長短「嗶」聲，不得有其他聲音、手勢或動作。"
+    ),
     "台北地下街任務": "正確答案：825公尺。誤差在100公尺（含）以內都算成功。",
     "頂埔站任務": (
         "沒有固定答案：請先記下隊伍在板南線月台上喊出的預測時間（例如 3分30秒），"
@@ -146,13 +216,20 @@ _IMAGES: dict[str, str] = {
     "忠孝敦化任務": "/challenge-images/ddr-machine.png",
     "西門町任務": "/challenge-images/takamatsu-tomori.png",
     "美麗華任務": "/challenge-images/miramar-stairs.png",
+    # The Morse reference chart the team decodes against — it *is* task
+    # material here, not just a hint, so the team needs it on screen.
+    "南港區民活動中心任務": "/challenge-images/morse-code.png",
+    # The description says 左圖 = 馬特拉 / 右圖 = 龐巴迪, and the modal renders
+    # image_url then image_url_2 side by side in that order — so these two
+    # can't be swapped without rewriting the description.
+    "木柵機廠任務": "/challenge-images/matra-train.png",
 }
 
-# name -> second reference photo (optional). Only 西門町任務 uses this
-# right now — the task accepts merch of either of two characters, so both
-# get shown. See models.py's Challenge.image_url_2 docstring.
+# name -> second reference photo (optional), rendered to the right of
+# _IMAGES' photo. See models.py's Challenge.image_url_2 docstring.
 _IMAGES_2: dict[str, str] = {
     "西門町任務": "/challenge-images/tennoji-rina.png",
+    "木柵機廠任務": "/challenge-images/bombardier-train.png",
 }
 
 # Manual coordinate corrections, keyed by (map-visible) challenge name —
@@ -167,9 +244,11 @@ _COORD_OVERRIDES: dict[str, tuple[float, float]] = {}
 #
 # Placeholder landmark challenges (36 of them, TBD reward-only entries) have
 # been removed — every challenge here now has real, written content. The 3
-# "active" ones below (all type='fixed') preserve the game's opening-pool
-# rule (exactly 3 start active, so the map isn't empty before a superadmin
-# ever touches anything); the rest start 'queued' and enter play later via
+# "active" ones below keep the map from being empty before a superadmin ever
+# touches anything. (They used to all be type='fixed', so a team's first
+# sight of the pool was never a call-your-shot/steal mechanic — 忠孝敦化任務
+# becoming 'variable' ends that; there are only two fixed challenges left, so
+# the rule can't hold as stated.) The rest start 'queued' and enter play via
 # activate_initial_pool()/_refill_pool() in game_logic.py.
 _CHALLENGES: list[tuple] = [
     ("台大二活任務", "multiplier", {"multiplier_pct": 40}, "台大二活門口", 25.012938045228722, 121.53662176506363, "queued"),
@@ -179,11 +258,18 @@ _CHALLENGES: list[tuple] = [
 
     ("葫洲站任務", "fixed", {"chips": 30}, "葫洲站", 25.072610389433837, 121.60702478470597, "active"),
     ("美麗華任務", "variable", {"chips_per_unit": 50, "unit_label": "趟"}, "美麗華百樂園", 25.083694238417248, 121.557050674598, "queued"),
-    ("忠孝敦化任務", "fixed", {"chips": 40}, "忠孝敦化站", 25.041351036032598, 121.55073436774637, "active"),
+    ("忠孝敦化任務", "variable", {"chips_per_unit": 5, "unit_label": "等級"}, "明曜百貨11樓", 25.041351036032598, 121.55073436774637, "active"),
     # Nudged ~50m off the 頂埔站 point (24.959634, 121.419375) so the pin
     # doesn't sit on top of the station dot — refine with the superadmin
     # 任務座標 tool if you want it exactly on the 板南線 platform.
     ("頂埔站任務", "steal", {"steal_pct": 30}, "頂埔站板南線月台", 24.959384, 121.419825, "queued"),
+    # APPROXIMATE COORDINATES — everything below is rounded to 4 decimals on
+    # purpose so it doesn't read as surveyed. Replace each with the real spot
+    # before the event, either here or via the superadmin 任務座標 tool.
+    ("南港區民活動中心任務", "steal", {"steal_pct": 30}, "南港區民活動中心門口階梯處", 25.0530, 121.6060, "queued"),
+    ("松山機場任務", "fixed", {"chips": 25}, "松山機場3F觀景台", 25.0629, 121.5518, "queued"),
+    ("木柵機廠任務", "multiplier", {"multiplier_pct": 40}, "木柵機廠", 24.9980, 121.5810, "queued"),
+    ("辛亥國小任務", "steal", {"steal_pct": 30}, "辛亥國小風雨籃球場", 25.0045, 121.5565, "queued"),
 ]
 
 
