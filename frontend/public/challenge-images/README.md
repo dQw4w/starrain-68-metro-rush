@@ -19,7 +19,7 @@ the file you actually drop in.
 
 Currently expected by seed_challenges.py:
 
-- `ddr-machine.png` — 忠孝敦化任務 (what a DDR cabinet looks like) ✅ already here
+- `ddr-machine.png` — 明曜百貨任務 (what a DDR cabinet looks like) ✅ already here
 - `takamatsu-tomori.png` — 西門町任務, `image_url` (高松燈 reference)
 - `tennoji-rina.png` — 西門町任務, `image_url_2` (天王寺璃奈 reference —
   this challenge accepts merch of either character, so both photos show)

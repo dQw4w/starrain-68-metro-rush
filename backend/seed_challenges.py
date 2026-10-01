@@ -84,7 +84,7 @@ _CONTENT: dict[str, tuple[str, str]] = {
         "決定之後你們將一起走至三鶯線的驗票閘門旁，到的時候一開始看到的三鶯線發車等候時間，"
         "如果跟你們預測的時間誤差不超過1分鐘，就算是任務成功，否則就任務失敗！",
     ),
-    "忠孝敦化任務": (
+    "明曜百貨任務": (
         "東區裡的舞步傳說",
         "如圖，Dance Dance Revolution，是二十幾年前曾經風靡全球的跳舞街機遊戲，時至今日，此遊戲雖然風光不如以往，"
         "但仍有許多忠實熱忱的玩家，也有一些把這個遊戲當成運動或拿來減肥的玩家。台北市內還有數個地方有這個機台，"
@@ -166,7 +166,7 @@ _ADMIN_NOTES: dict[str, str] = {
         "確認：商品上沒有其他角色圖案、價格在300元（含）以內。"
     ),
     "葫洲站任務": "正確店家：ieat早午餐（真極品牛肉麵）。找錯家直接判失敗，只有一次機會。",
-    "忠孝敦化任務": (
+    "明曜百貨任務": (
         "地點：明曜百貨11樓卡通尼樂園。開始前發6枚代幣給隊伍。\n"
         "並沒有限制只能一個人玩，可以多人合作、一人負責一個踏板。\n"
         "判斷過關：第3首歌結束後畫面顯示「STAGE CLEARED」，且評等不是 E 等。\n"
@@ -213,23 +213,23 @@ _ADMIN_NOTES: dict[str, str] = {
 # venue/answer. Files live in frontend/public/challenge-images/ (see the
 # README there) and are served at this exact path by the built SPA.
 _IMAGES: dict[str, str] = {
-    "忠孝敦化任務": "/challenge-images/ddr-machine.png",
+    "明曜百貨任務": "/challenge-images/ddr-machine.png",
     "西門町任務": "/challenge-images/takamatsu-tomori.png",
-    "美麗華任務": "/challenge-images/miramar-stairs.png",
+    "美麗華任務": "/challenge-images/miramar-stairs.jpg",
     # The Morse reference chart the team decodes against — it *is* task
     # material here, not just a hint, so the team needs it on screen.
     "南港區民活動中心任務": "/challenge-images/morse-code.png",
     # The description says 左圖 = 馬特拉 / 右圖 = 龐巴迪, and the modal renders
     # image_url then image_url_2 side by side in that order — so these two
     # can't be swapped without rewriting the description.
-    "木柵機廠任務": "/challenge-images/matra-train.png",
+    "木柵機廠任務": "/challenge-images/matra-train.jpg",
 }
 
 # name -> second reference photo (optional), rendered to the right of
 # _IMAGES' photo. See models.py's Challenge.image_url_2 docstring.
 _IMAGES_2: dict[str, str] = {
     "西門町任務": "/challenge-images/tennoji-rina.png",
-    "木柵機廠任務": "/challenge-images/bombardier-train.png",
+    "木柵機廠任務": "/challenge-images/bombardier-train.jpg",
 }
 
 # Manual coordinate corrections, keyed by (map-visible) challenge name —
@@ -238,7 +238,14 @@ _IMAGES_2: dict[str, str] = {
 # "任務管理" tab's 任務座標 mode — pick a challenge, drag/click its marker to
 # the right spot, then use its 輸出 button to get a properly-formatted entry
 # to paste in here.
-_COORD_OVERRIDES: dict[str, tuple[float, float]] = {}
+_COORD_OVERRIDES: dict[str, tuple[float, float]] = {
+    "木柵機廠任務": (25.001748, 121.584985),
+    "松山機場任務": (25.064416, 121.550315),
+    "頂埔站任務": (24.959737, 121.419616),
+    "明曜百貨任務": (25.041225, 121.552058),
+    "辛亥國小任務": (25.006418, 121.558877),
+    "南港區民活動中心任務": (25.053535, 121.607956),
+}
 
 # name, type, reward_config, location_name, lat, lng, initial_pool_state
 #
@@ -246,7 +253,7 @@ _COORD_OVERRIDES: dict[str, tuple[float, float]] = {}
 # been removed — every challenge here now has real, written content. The 3
 # "active" ones below keep the map from being empty before a superadmin ever
 # touches anything. (They used to all be type='fixed', so a team's first
-# sight of the pool was never a call-your-shot/steal mechanic — 忠孝敦化任務
+# sight of the pool was never a call-your-shot/steal mechanic — 明曜百貨任務
 # becoming 'variable' ends that; there are only two fixed challenges left, so
 # the rule can't hold as stated.) The rest start 'queued' and enter play via
 # activate_initial_pool()/_refill_pool() in game_logic.py.
@@ -258,7 +265,7 @@ _CHALLENGES: list[tuple] = [
 
     ("葫洲站任務", "fixed", {"chips": 30}, "葫洲站", 25.072610389433837, 121.60702478470597, "active"),
     ("美麗華任務", "variable", {"chips_per_unit": 50, "unit_label": "趟"}, "美麗華百樂園", 25.083694238417248, 121.557050674598, "queued"),
-    ("忠孝敦化任務", "variable", {"chips_per_unit": 5, "unit_label": "等級"}, "明曜百貨11樓", 25.041351036032598, 121.55073436774637, "active"),
+    ("明曜百貨任務", "variable", {"chips_per_unit": 5, "unit_label": "等級"}, "明曜百貨11樓", 25.041351036032598, 121.55073436774637, "active"),
     # Nudged ~50m off the 頂埔站 point (24.959634, 121.419375) so the pin
     # doesn't sit on top of the station dot — refine with the superadmin
     # 任務座標 tool if you want it exactly on the 板南線 platform.
