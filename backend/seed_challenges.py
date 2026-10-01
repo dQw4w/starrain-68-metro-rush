@@ -131,6 +131,23 @@ _CONTENT: dict[str, tuple[str, str]] = {
         "在你們準備好後，隨隊人員會給發出訊號組的看題目，結束後解密組必須完整地將題目的單字拼出，"
         "如果差一個字母就任務失敗。",
     ),
+    "幸福站任務": (
+        "幸福好滋味",
+        "「下一站，幸福」是很多人喜歡在搭捷運時拍下的環狀線車內顯示器的畫面。"
+        "現在，你們已在幸福站下車，即將尋找幸福的好滋味。"
+        "請先站在捷運站內，決定你們可以找到幾家招牌上有「幸福」二字的餐廳、便利商店或超市"
+        "（或是任何有賣食物的店家）。"
+        "如果能在10分鐘內成功找到指定的店家數，即可獲得「5×店家數」的代幣；如果無法則任務失敗。"
+        "尋找店家的過程中全程禁止使用手機。",
+    ),
+    "林本源園邸任務": (
+        "園子裡的那幾個字",
+        "歡迎來到林本源園邸，又稱板橋林家花園。林家於1847年在此設立租館，"
+        "林國華、林國芳兄弟自1851年起興建三落大厝，花園部分則於1853年完成。"
+        "板橋林家靠米業與鹽務成為清代臺灣的巨商，第三代林維源更曾協助臺灣巡撫劉銘傳推動撫墾與商務。"
+        "這座園林仿蘇州留園設計，是目前臺灣僅存最完整的園林建築，並於1985年被指定為國定古蹟。"
+        "現在，請在門口看完這個題字，把他記住，收起手機進入林本源園邸，並在10分鐘內找到他。",
+    ),
 }
 
 # name -> admin_notes. The answer key / judging reference for whoever
@@ -204,6 +221,16 @@ _ADMIN_NOTES: dict[str, str] = {
         "接著全隊一起走到三鶯線驗票閘門旁，以「第一眼看到」的三鶯線發車等候時間為準，"
         "誤差在1分鐘（含）以內算成功。移動途中不得更改預測時間。"
     ),
+    "幸福站任務": (
+        "請叫大家到站外，並且喊 3、2、1 開始計時；開始計時後大家才能開始移動。\n"
+        "限時10分鐘內找到隊伍宣告的店家數，達標才算成功。\n"
+        "認定標準：招牌上要有「幸福」二字，餐廳、便利商店、超市或任何有賣食物的店家都算。\n"
+        "計時開始後全程禁止使用手機，請留意有沒有人偷看。"
+    ),
+    "林本源園邸任務": (
+        "計時在所有人都踏進去林本源園邸之後才開始，限時10分鐘內找到題字的所在位置。\n"
+        "不確定是否需要門票；如果需要，請帶大家拿著學生證去售票口兌換免費的票。"
+    ),
 }
 
 # name -> image_url. A reference photo shown alongside the task description —
@@ -219,6 +246,9 @@ _IMAGES: dict[str, str] = {
     # The Morse reference chart the team decodes against — it *is* task
     # material here, not just a hint, so the team needs it on screen.
     "南港區民活動中心任務": "/challenge-images/morse-code.png",
+    # The inscription the team memorises at the gate and then hunts for —
+    # task material, like the Morse chart above, not just a hint.
+    "林本源園邸任務": "/challenge-images/lin-garden-inscription.png",
     # The description says 左圖 = 馬特拉 / 右圖 = 龐巴迪, and the modal renders
     # image_url then image_url_2 side by side in that order — so these two
     # can't be swapped without rewriting the description.
@@ -266,10 +296,13 @@ _CHALLENGES: list[tuple] = [
     ("葫洲站任務", "fixed", {"chips": 30}, "葫洲站", 25.072610389433837, 121.60702478470597, "active"),
     ("美麗華任務", "variable", {"chips_per_unit": 50, "unit_label": "趟"}, "美麗華百樂園", 25.083694238417248, 121.557050674598, "queued"),
     ("明曜百貨任務", "variable", {"chips_per_unit": 5, "unit_label": "等級"}, "明曜百貨11樓", 25.041351036032598, 121.55073436774637, "active"),
-    # Nudged ~50m off the 頂埔站 point (24.959634, 121.419375) so the pin
-    # doesn't sit on top of the station dot — refine with the superadmin
-    # 任務座標 tool if you want it exactly on the 板南線 platform.
+    # Both nudged ~50m off their station's point (頂埔站 24.959634,
+    # 121.419375 / 幸福站 25.049973, 121.460016 — the effective coordinates
+    # seed_stations.py gives them) so the pin doesn't sit on top of the
+    # station dot. Refine with the superadmin 任務座標 tool if you want them
+    # on an exact spot.
     ("頂埔站任務", "steal", {"steal_pct": 30}, "頂埔站板南線月台", 24.959384, 121.419825, "queued"),
+    ("幸福站任務", "variable", {"chips_per_unit": 5, "unit_label": "店家"}, "幸福站", 25.049723, 121.460466, "queued"),
     # APPROXIMATE COORDINATES — everything below is rounded to 4 decimals on
     # purpose so it doesn't read as surveyed. Replace each with the real spot
     # before the event, either here or via the superadmin 任務座標 tool.
@@ -277,6 +310,7 @@ _CHALLENGES: list[tuple] = [
     ("松山機場任務", "fixed", {"chips": 25}, "松山機場3F觀景台", 25.0629, 121.5518, "queued"),
     ("木柵機廠任務", "multiplier", {"multiplier_pct": 40}, "木柵機廠", 24.9980, 121.5810, "queued"),
     ("辛亥國小任務", "steal", {"steal_pct": 30}, "辛亥國小風雨籃球場", 25.0045, 121.5565, "queued"),
+    ("林本源園邸任務", "fixed", {"chips": 25}, "林本源園邸", 25.0113, 121.4549, "queued"),
 ]
 
 

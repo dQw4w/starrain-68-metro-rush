@@ -28,6 +28,8 @@ Currently expected by seed_challenges.py:
   this one is task material, not just a hint: the team decodes against it)
 - `matra-train.png` — 木柵機廠任務, `image_url` (馬特拉列車)
 - `bombardier-train.png` — 木柵機廠任務, `image_url_2` (龐巴迪列車)
+- `lin-garden-inscription.png` — 林本源園邸任務 (the 題字 the team memorises
+  at the gate and then hunts for inside — task material, not just a hint)
 
 The 木柵機廠 description says 左圖 = 馬特拉 and 右圖 = 龐巴迪, and the modal
 renders `image_url` on the left, `image_url_2` on the right — so those two
