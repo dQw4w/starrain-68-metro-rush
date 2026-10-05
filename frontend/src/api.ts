@@ -16,6 +16,18 @@ import type {
   TeamState,
 } from './types'
 
+/** Carries the HTTP status so callers can tell "your session died" (401) apart
+ *  from a normal rejection — a stale admin session otherwise renders the
+ *  dashboard shell with every fetch silently failing. */
+export class ApiError extends Error {
+  status: number
+  constructor(message: string, status: number) {
+    super(message)
+    this.name = 'ApiError'
+    this.status = status
+  }
+}
+
 async function req<T>(path: string, options: RequestInit = {}): Promise<T> {
   const res = await fetch(`/api${path}`, {
     ...options,
@@ -32,7 +44,7 @@ async function req<T>(path: string, options: RequestInit = {}): Promise<T> {
     } catch {
       /* ignore */
     }
-    throw new Error(detail)
+    throw new ApiError(detail, res.status)
   }
   if (res.status === 204) return undefined as T
   return res.json()
@@ -87,6 +99,10 @@ export const api = {
       headers: authHeaders(token),
       body: body ? JSON.stringify(body) : undefined,
     }),
+  /** Already-applied claims/top-ups, newest first — the feed the team admin can reject from. */
+  adminStationActions: (token: string, teamId: number) =>
+    req<ApprovalRequest[]>(`/admin/team/${teamId}/station-actions`, { headers: authHeaders(token) }),
+  /** For a claim/top-up this reverses the (already applied) action; for a challenge_start it denies it. */
   adminDeny: (token: string, teamId: number, requestId: number) =>
     req<any>(`/admin/team/${teamId}/deny/${requestId}`, { method: 'POST', headers: authHeaders(token) }),
   adminGps: (token: string, teamId: number) =>

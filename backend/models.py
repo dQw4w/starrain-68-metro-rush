@@ -161,6 +161,7 @@ class TeamPublic(BaseModel):
 class TeamAdminView(TeamPublic):
     share_token: str
     admin_share_token: str
+    readonly_share_token: Optional[str] = None
 
 
 class TeamCreate(BaseModel):
@@ -182,6 +183,9 @@ class TeamSelf(BaseModel):
     color_hex: str
     meeting_station_id: Optional[int]
     chips_balance: int
+    # Whichever link the caller actually used — never the writable one when
+    # they came in on the read-only link, or handing someone the read-only
+    # link would hand them the ability to act after one API call.
     share_token: str
 
 
@@ -211,7 +215,10 @@ class ApprovalRequestOut(BaseModel):
     challenge_attempt_id: Optional[int]
     requested_by: Optional[str]
     requested_value: dict[str, Any]
-    status: Literal["pending", "approved", "denied", "stale"]
+    # 'applied'/'reversed' are the station-claim lifecycle (applied on the
+    # spot, optionally rejected afterwards); the rest are the challenge
+    # approval lifecycle. See game_logic.create_action_request.
+    status: Literal["pending", "approved", "denied", "stale", "applied", "reversed"]
     resolved_by: Optional[int]
     resolved_at: Optional[datetime]
     created_at: datetime
@@ -392,3 +399,6 @@ class TeamState(BaseModel):
     phase: GamePhase
     ranking: list[TeamPublic]
     pending_requests: list[ApprovalRequestOut]
+    # True when this came in on the team's read-only link: the UI shows the
+    # same screens but hides every action (see routers/team._is_read_only).
+    read_only: bool = False

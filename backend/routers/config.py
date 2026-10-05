@@ -78,6 +78,7 @@ async def list_teams(_: AdminIdentity = Depends(require_superadmin)):
             meeting_station_id=r["meeting_station_id"], chips_balance=r["chips_balance"],
             active=r["active"], stations_owned=r["stations_owned"], rank=0,
             share_token=r["share_token"], admin_share_token=r["admin_share_token"],
+            readonly_share_token=r["readonly_share_token"],
         )
         for r in rows
     ]
@@ -92,12 +93,14 @@ async def create_team(body: TeamCreate, admin: AdminIdentity = Depends(require_s
 
     share_token = secrets.token_urlsafe(8)
     admin_share_token = secrets.token_urlsafe(24)
+    readonly_share_token = secrets.token_urlsafe(24)
     async with pool.acquire() as conn:
         async with conn.transaction():
             team = await conn.fetchrow(
-                """INSERT INTO teams (name, color_hex, meeting_station_id, chips_balance, share_token)
-                   VALUES ($1, $2, $3, $4, $5) RETURNING *""",
+                """INSERT INTO teams (name, color_hex, meeting_station_id, chips_balance, share_token, readonly_share_token)
+                   VALUES ($1, $2, $3, $4, $5, $6) RETURNING *""",
                 body.name, body.color_hex, body.meeting_station_id, cfg["starting_chips"], share_token,
+                readonly_share_token,
             )
             await conn.execute(
                 "INSERT INTO admins (team_id, display_name, admin_share_token) VALUES ($1, $2, $3)",
@@ -109,6 +112,7 @@ async def create_team(body: TeamCreate, admin: AdminIdentity = Depends(require_s
         meeting_station_id=team["meeting_station_id"], chips_balance=team["chips_balance"],
         active=team["active"], stations_owned=0, rank=0,
         share_token=team["share_token"], admin_share_token=admin_share_token,
+        readonly_share_token=team["readonly_share_token"],
     )
 
 
@@ -141,6 +145,7 @@ async def update_team(team_id: int, body: TeamUpdate, admin: AdminIdentity = Dep
         meeting_station_id=team["meeting_station_id"], chips_balance=team["chips_balance"],
         active=team["active"], stations_owned=stations_owned, rank=0,
         share_token=team["share_token"], admin_share_token=admin_share_token,
+        readonly_share_token=team["readonly_share_token"],
     )
 
 
@@ -168,6 +173,7 @@ async def regenerate_admin_link(team_id: int, admin: AdminIdentity = Depends(req
         meeting_station_id=team["meeting_station_id"], chips_balance=team["chips_balance"],
         active=team["active"], stations_owned=stations_owned, rank=0,
         share_token=team["share_token"], admin_share_token=new_token,
+        readonly_share_token=team["readonly_share_token"],
     )
 
 
@@ -247,6 +253,7 @@ async def _team_admin_view_by_id(pool, team_id: int) -> TeamAdminView:
         meeting_station_id=row["meeting_station_id"], chips_balance=row["chips_balance"],
         active=row["active"], stations_owned=row["stations_owned"], rank=0,
         share_token=row["share_token"], admin_share_token=row["admin_share_token"],
+        readonly_share_token=row["readonly_share_token"],
     )
 
 

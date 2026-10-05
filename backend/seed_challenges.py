@@ -122,11 +122,12 @@ _CONTENT: dict[str, tuple[str, str]] = {
         "在宣告開始挑戰之前，你們可以自由練習並討論順序的策略。",
     ),
     "南港區民活動中心任務": (
-        "嗶——嗶嗶嗶——",
+        "啪——啪啪啪——",
         "歡迎來到南港區民活動中心，這裡是星雨上一期青假早上認識活動以及教案的進行場地。"
         "其中，教案組設計的其中一個活動就是摩斯密碼。"
         "現在，小隊請分成人數相同（或是最多差1個人）的兩組，一組負責發出訊號，一組負責接收訊號並解碼。"
-        "發訊號的方式只能使用嘴巴發出長短的「嗶……」聲，不能發出其他聲音，也不能做出任何手勢或動作。"
+        "發訊號的方式只能使用拍手，以長拍與短拍來表示長音與短音，"
+        "不能發出任何聲音（講話、嗶聲等都不行），也不能做出拍手以外的手勢或動作。"
         "題目是一個英文單字，請參照上方的對照表來進行訊號發送／解密。"
         "在你們準備好後，隨隊人員會給發出訊號組的看題目，結束後解密組必須完整地將題目的單字拼出，"
         "如果差一個字母就任務失敗。",
@@ -213,7 +214,7 @@ _ADMIN_NOTES: dict[str, str] = {
     "南港區民活動中心任務": (
         "題目單字：asperger（請只給發訊號組看，不要讓解碼組看到）。\n"
         "解碼組必須完整拼出 asperger，差一個字母就算失敗。\n"
-        "過程中發訊號組只能用嘴巴發出長短「嗶」聲，不得有其他聲音、手勢或動作。"
+        "過程中發訊號組只能用拍手（長拍／短拍）傳訊號，不得發出任何聲音，也不得有拍手以外的手勢或動作。"
     ),
     "台北地下街任務": "正確答案：825公尺。誤差在100公尺（含）以內都算成功。",
     "頂埔站任務": (
@@ -245,10 +246,10 @@ _IMAGES: dict[str, str] = {
     "美麗華任務": "/challenge-images/miramar-stairs.jpg",
     # The Morse reference chart the team decodes against — it *is* task
     # material here, not just a hint, so the team needs it on screen.
-    "南港區民活動中心任務": "/challenge-images/morse-code.png",
+    "南港區民活動中心任務": "/challenge-images/morse-code.jpg",
     # The inscription the team memorises at the gate and then hunts for —
     # task material, like the Morse chart above, not just a hint.
-    "林本源園邸任務": "/challenge-images/lin-garden-inscription.png",
+    "林本源園邸任務": "/challenge-images/lin-garden-inscription.jpg",
     # The description says 左圖 = 馬特拉 / 右圖 = 龐巴迪, and the modal renders
     # image_url then image_url_2 side by side in that order — so these two
     # can't be swapped without rewriting the description.

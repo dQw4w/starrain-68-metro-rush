@@ -31,11 +31,12 @@ export default function TeamAdminPage() {
   const [linkError, setLinkError] = useState('')
   const [teamInfo, setTeamInfo] = useState<TeamPublic | null>(null)
   const [pending, setPending] = useState<ApprovalRequest[]>([])
+  const [stationActions, setStationActions] = useState<ApprovalRequest[]>([])
   const [log, setLog] = useState<ActionLogEntry[]>([])
   const [gps, setGps] = useState<DevicePosition[]>([])
   const [mapData, setMapData] = useState<MapData | null>(null)
   const [challenges, setChallenges] = useState<ChallengeAdminView[]>([])
-  const [tab, setTab] = useState<'queue' | 'log' | 'gps' | 'adjust'>('queue')
+  const [tab, setTab] = useState<'queue' | 'claims' | 'log' | 'gps' | 'adjust'>('queue')
   const [error, setError] = useState('')
   const [busyId, setBusyId] = useState<number | null>(null)
   const { phase, refetchPhase } = usePhase()
@@ -51,14 +52,16 @@ export default function TeamAdminPage() {
 
   const refresh = useCallback(async () => {
     if (!token || !teamId) return
-    const [info, pend, l, g] = await Promise.all([
+    const [info, pend, acts, l, g] = await Promise.all([
       api.adminTeamInfo(token, teamId),
       api.adminPending(token, teamId),
+      api.adminStationActions(token, teamId),
       api.adminLog(token, teamId),
       api.adminGps(token, teamId),
     ])
     setTeamInfo(info)
     setPending(pend)
+    setStationActions(acts)
     setLog(l)
     setGps(g)
   }, [token, teamId])
@@ -169,13 +172,13 @@ export default function TeamAdminPage() {
       </header>
 
       <nav className="flex bg-slate-800/60 border-t border-white/10">
-        {(['queue', 'log', 'gps', 'adjust'] as const).map((t) => (
+        {(['queue', 'claims', 'log', 'gps', 'adjust'] as const).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
             className={`flex-1 py-2.5 text-sm font-bold relative ${tab === t ? 'text-white bg-white/10' : 'text-white/50'}`}
           >
-            {{ queue: '待審核', log: '紀錄', gps: 'GPS', adjust: '調整代幣' }[t]}
+            {{ queue: '待審核', claims: '佔領紀錄', log: '紀錄', gps: 'GPS', adjust: '調整代幣' }[t]}
             {t === 'queue' && pending.length > 0 && (
               <span className="absolute top-1 right-3 bg-rose-500 text-xs rounded-full w-4 h-4 flex items-center justify-center">
                 {pending.length}
@@ -207,6 +210,25 @@ export default function TeamAdminPage() {
           </div>
         )}
 
+        {tab === 'claims' && (
+          <div className="flex flex-col gap-2">
+            <p className="text-xs text-white/40 px-1">
+              佔領與加碼不需核准，隊伍按下去就直接生效。這裡是已生效的紀錄，如果有誤可以駁回，
+              車站會回到該次操作前的狀態並退還代幣。
+            </p>
+            {stationActions.length === 0 && <p className="text-white/40 text-center py-8">還沒有佔領或加碼紀錄</p>}
+            {stationActions.map((a) => (
+              <StationActionCard
+                key={a.id}
+                action={a}
+                busy={busyId === a.id}
+                stationName={stationName}
+                onReject={() => handleDeny(a)}
+              />
+            ))}
+          </div>
+        )}
+
         {tab === 'log' && <ActionLogList entries={log} />}
 
         {tab === 'gps' && mapData && (
@@ -227,6 +249,49 @@ export default function TeamAdminPage() {
 
 function Spinner() {
   return <span className="inline-block w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+}
+
+function StationActionCard({
+  action,
+  busy,
+  stationName,
+  onReject,
+}: {
+  action: ApprovalRequest
+  busy: boolean
+  stationName: (id: number) => string
+  onReject: () => void
+}) {
+  const reversed = action.status === 'reversed'
+  const amount = action.requested_value?.amount
+  const label = action.kind === 'claim' ? '佔領' : '加碼'
+  return (
+    <div className={`rounded-xl p-3 ${reversed ? 'bg-white/5 opacity-50' : 'bg-white/5'}`}>
+      <div className="flex justify-between items-baseline gap-2">
+        <span className="font-bold">
+          {label}
+          {action.station_id != null && ` · ${stationName(action.station_id)}`}
+        </span>
+        <span className="text-xs text-white/40 shrink-0">
+          {new Date(action.created_at).toLocaleTimeString('zh-TW')}
+        </span>
+      </div>
+      {amount != null && (
+        <p className="text-sm font-bold text-amber-300">
+          投入 {amount} 枚{reversed && ' · 已駁回並退還'}
+        </p>
+      )}
+      {!reversed && (
+        <button
+          disabled={busy}
+          onClick={onReject}
+          className="mt-2 bg-rose-600 disabled:opacity-50 rounded-lg px-3 py-1.5 text-xs font-bold flex items-center gap-1.5"
+        >
+          {busy ? <Spinner /> : '駁回並還原'}
+        </button>
+      )}
+    </div>
+  )
 }
 
 function PendingCard({

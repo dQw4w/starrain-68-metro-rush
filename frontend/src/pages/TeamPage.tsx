@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { api } from '../api'
 import ActionLogList from '../components/ActionLogList'
@@ -114,9 +114,11 @@ export default function TeamPage() {
   )
   useWebSocket(getTicket, handleWsEvent)
 
-  // Send this device's GPS position periodically.
+  // Send this device's GPS position periodically. Skipped on the read-only
+  // link — that viewer isn't walking with the team, so their position would
+  // just be noise on the admin's GPS map (the endpoint rejects it anyway).
   useEffect(() => {
-    if (!token || !('geolocation' in navigator)) return
+    if (!token || state?.read_only || !('geolocation' in navigator)) return
     const deviceId = getDeviceId()
     const watchId = navigator.geolocation.watchPosition(
       (pos) => {
@@ -126,7 +128,34 @@ export default function TeamPage() {
       { enableHighAccuracy: false, maximumAge: 15000, timeout: 10000 }
     )
     return () => navigator.geolocation.clearWatch(watchId)
-  }, [token])
+  }, [token, state?.read_only])
+
+  // Pop the in-progress challenge open by itself, so nobody has to go hunting
+  // for the pin to read the task. The read-only link does this every time an
+  // attempt starts (it's a spectator view — the point is to surface what the
+  // team is doing); the player link only does it once per page load, so it
+  // can't yank the modal back up while they're using the map.
+  const autoOpenedChallengeRef = useRef<number | null>(null)
+  const playerAutoOpenDoneRef = useRef(false)
+  const inProgressAttempt = myAttempts.find((a) => a.status === 'in_progress')
+  const readOnlyState = state?.read_only
+  useEffect(() => {
+    if (!inProgressAttempt) {
+      autoOpenedChallengeRef.current = null
+      return
+    }
+    // Already opened this particular attempt — don't fight the viewer if
+    // they've closed it.
+    if (autoOpenedChallengeRef.current === inProgressAttempt.challenge_id) return
+    if (!readOnlyState) {
+      if (playerAutoOpenDoneRef.current) return
+      playerAutoOpenDoneRef.current = true
+    }
+    const ch = challenges.find((c) => c.id === inProgressAttempt.challenge_id)
+    if (!ch) return
+    autoOpenedChallengeRef.current = inProgressAttempt.challenge_id
+    setSelectedChallenge(ch)
+  }, [inProgressAttempt, challenges, readOnlyState])
 
   // Cleared only when switching challenges (not on every attempt-status
   // refetch below) so a stale previous challenge's detail never flashes.
@@ -156,9 +185,7 @@ export default function TeamPage() {
   }
 
   const myTeam = state.team
-  const pendingStationRequest = state.pending_requests.find(
-    (r) => (r.kind === 'claim' || r.kind === 'topup') && r.station_id === selectedStation?.id
-  )
+  const readOnly = state.read_only
   const pendingChallengeRequest = state.pending_requests.find(
     (r) => r.kind === 'challenge_start' && r.challenge_id === selectedChallenge?.id
   )
@@ -183,7 +210,7 @@ export default function TeamPage() {
   }
 
   return (
-    <div className="h-screen w-screen flex flex-col landscape:flex-row bg-slate-900 text-white overflow-hidden">
+    <div className="app-viewport w-screen flex flex-col landscape:flex-row bg-slate-900 text-white overflow-hidden">
       <ToastStack toasts={toasts} />
       <header className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-2.5 bg-slate-800/90 landscape:flex-col landscape:items-start landscape:w-64 landscape:h-full landscape:overflow-y-auto shrink-0 z-10">
         <div className="flex items-center gap-2 flex-1 landscape:w-full">
@@ -231,7 +258,7 @@ export default function TeamPage() {
         <TabButton tab="challenges" current={tab} setTab={setTab} label="任務" grow />
         <TabButton tab="log" current={tab} setTab={setTab} label="紀錄" grow />
       </nav>
-      <div className="landscape:hidden bg-slate-800/60 h-56 overflow-y-auto p-3 shrink-0">
+      <div className="landscape:hidden bg-slate-800/60 h-56 overflow-y-auto p-3 shrink-0 pb-safe">
         <TabContent
           tab={tab}
           state={state}
@@ -248,7 +275,7 @@ export default function TeamPage() {
           mapData={mapData}
           myTeamId={myTeam.id}
           teams={state.ranking}
-          hasPendingRequest={!!pendingStationRequest}
+          readOnly={readOnly}
           maxDepositPerVisit={maxDepositPerVisit}
           onClose={() => setSelectedStation(null)}
           onSubmit={submitClaim}
@@ -263,6 +290,7 @@ export default function TeamPage() {
           teams={state.ranking}
           myTeamId={myTeam.id}
           hasPendingRequest={!!pendingChallengeRequest}
+          readOnly={readOnly}
           failBonusStepPct={failBonusStepPct}
           onClose={() => setSelectedChallenge(null)}
           onStart={submitChallengeStart}

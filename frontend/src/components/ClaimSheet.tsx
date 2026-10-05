@@ -14,7 +14,8 @@ interface Props {
   mapData: MapData
   myTeamId: number
   teams: TeamPublic[]
-  hasPendingRequest: boolean
+  /** Read-only link: station info still shows, but there's nothing to submit with. */
+  readOnly?: boolean
   maxDepositPerVisit: number
   onClose: () => void
   onSubmit: (kind: 'claim' | 'topup', amount: number) => Promise<void>
@@ -25,7 +26,7 @@ export default function ClaimSheet({
   mapData,
   myTeamId,
   teams,
-  hasPendingRequest,
+  readOnly = false,
   maxDepositPerVisit,
   onClose,
   onSubmit,
@@ -66,9 +67,11 @@ export default function ClaimSheet({
     try {
       await onSubmit(kind, amount)
       localStorage.setItem(LAST_AMOUNT_KEY, String(amount))
+      // Claims take effect immediately now, so there's nothing left to watch
+      // on this sheet — drop straight back to the map.
+      onClose()
     } catch (e: any) {
       setError(e.message || '操作失敗')
-    } finally {
       setBusy(false)
     }
   }
@@ -96,8 +99,8 @@ export default function ClaimSheet({
 
         {error && <p className="text-rose-400 text-sm mt-2">{error}</p>}
 
-        {hasPendingRequest ? (
-          <p className="mt-4 text-amber-300 font-medium">⏳ 已送出申請，等待隨隊管理員核准…</p>
+        {readOnly ? (
+          <p className="mt-4 text-white/50">唯讀連結：無法進行佔領或加碼。</p>
         ) : maxed ? (
           <p className="mt-4 text-white/50">此車站代幣數已達上限，無法再變動。</p>
         ) : (
@@ -120,7 +123,7 @@ export default function ClaimSheet({
               <StepButton label="+5" onClick={() => adjust(5)} disabled={amount + 5 > maxAmount} />
             </div>
             <button disabled={busy} onClick={handleSubmit} className="w-full bg-blue-600 disabled:opacity-40 font-bold rounded-xl py-3">
-              {isMine ? '加碼投入代幣' : '佔領此車站'}（需管理員核准）
+              {isMine ? '加碼投入代幣' : '佔領此車站'}
             </button>
           </div>
         )}

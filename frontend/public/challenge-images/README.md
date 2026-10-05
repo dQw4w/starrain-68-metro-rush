@@ -24,11 +24,11 @@ Currently expected by seed_challenges.py:
 - `tennoji-rina.png` — 西門町任務, `image_url_2` (天王寺璃奈 reference —
   this challenge accepts merch of either character, so both photos show)
 - `miramar-stairs.png` — 美麗華任務 (the ground-floor stairway entrance)
-- `morse-code.png` — 南港區民活動中心任務 (the Morse code reference chart —
+- `morse-code.jpg` — 南港區民活動中心任務 (the Morse code reference chart —
   this one is task material, not just a hint: the team decodes against it)
 - `matra-train.png` — 木柵機廠任務, `image_url` (馬特拉列車)
 - `bombardier-train.png` — 木柵機廠任務, `image_url_2` (龐巴迪列車)
-- `lin-garden-inscription.png` — 林本源園邸任務 (the 題字 the team memorises
+- `lin-garden-inscription.jpg` — 林本源園邸任務 (the 題字 the team memorises
   at the gate and then hunts for inside — task material, not just a hint)
 
 The 木柵機廠 description says 左圖 = 馬特拉 and 右圖 = 龐巴迪, and the modal

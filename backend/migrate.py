@@ -24,7 +24,8 @@ async def run_migrations() -> None:
 
 async def _backfill_admin_links() -> None:
     """Any team admin created before admin_share_token existed gets one now,
-    so a link-based flow rolled out mid-project doesn't strand old teams."""
+    so a link-based flow rolled out mid-project doesn't strand old teams.
+    Same for the per-team read-only link, added later still."""
     pool = get_pool()
     rows = await pool.fetch(
         "SELECT id FROM admins WHERE team_id IS NOT NULL AND admin_share_token IS NULL"
@@ -36,6 +37,15 @@ async def _backfill_admin_links() -> None:
         )
     if rows:
         logger.info(f"Backfilled admin_share_token for {len(rows)} team admin(s).")
+
+    ro = await pool.fetch("SELECT id FROM teams WHERE readonly_share_token IS NULL")
+    for row in ro:
+        await pool.execute(
+            "UPDATE teams SET readonly_share_token = $1 WHERE id = $2",
+            secrets.token_urlsafe(24), row["id"],
+        )
+    if ro:
+        logger.info(f"Backfilled readonly_share_token for {len(ro)} team(s).")
 
 
 async def _ensure_superadmin() -> None:

@@ -145,6 +145,16 @@ def _deposit_bounds(kind: str, current_value: int, cap: int, bonus: int) -> tupl
 
 async def create_action_request(team_id: int, station_id: int, kind: str,
                                   requested_by: str | None, amount: int) -> dict:
+    """Claims and top-ups take effect immediately — there is no admin approval
+    step for them (challenges still have one). A team admin tapping 核准 at
+    every single station was the bottleneck, and rejections are rare, so the
+    admin instead sees each applied action in a feed and can reject one
+    afterwards, which reverses it (see reverse_action_request).
+
+    The approval_requests row this writes is therefore a record of something
+    already done, status 'applied' — it carries before/after snapshots of the
+    station purely so a rejection can put things back.
+    """
     await assert_active_phase()
     pool = get_pool()
     result: dict = {}
@@ -152,77 +162,112 @@ async def create_action_request(team_id: int, station_id: int, kind: str,
 
     async with pool.acquire() as conn:
         async with conn.transaction():
-            existing = await conn.fetchrow(
-                """SELECT * FROM approval_requests
-                   WHERE team_id = $1 AND station_id = $2 AND kind = ANY($3::text[]) AND status = 'pending'""",
-                team_id, station_id, ["claim", "topup"],
-            )
-            if existing is not None:
-                result = {"status": "pending", "request": dict(existing)}
+            claim = await conn.fetchrow("SELECT * FROM station_claims WHERE station_id = $1 FOR UPDATE", station_id)
+            team = await conn.fetchrow("SELECT * FROM teams WHERE id = $1 FOR UPDATE", team_id)
+            cfg = await conn.fetchrow("SELECT * FROM game_config WHERE id = 1")
+            if claim is None or team is None:
+                raise HTTPException(status_code=404, detail="車站或隊伍不存在")
+
+            if kind == "topup" and claim["owner_team_id"] != team_id:
+                raise HTTPException(status_code=400, detail="只能對己方車站加碼")
+            if kind == "claim" and claim["owner_team_id"] == team_id:
+                raise HTTPException(status_code=400, detail="此車站已為己方所有，請使用加碼")
+            # Only top-ups are ever "maxed out" — a claim always gets a fresh
+            # ceiling relative to the current value, so a rival team can
+            # always take a station away no matter how high its value is.
+            if kind == "topup" and claim["value"] >= claim["cap"]:
+                raise HTTPException(status_code=400, detail="此車站代幣數已達目前上限，無法再加碼")
+
+            if kind == "claim" and claim["owner_team_id"] is not None and team["chips_balance"] < 0:
+                # Negative-balance team passing through enemy territory: deterministic
+                # toll, executed immediately with no admin judgment call needed.
+                cost = claim["value"] + 1
+                owner_id = claim["owner_team_id"]
+                await conn.execute("UPDATE teams SET chips_balance = chips_balance - $1 WHERE id = $2", cost, team_id)
+                await conn.execute("UPDATE teams SET chips_balance = chips_balance + $1 WHERE id = $2", cost, owner_id)
+                payer_balance = team["chips_balance"] - cost
+                owner_row = await conn.fetchrow("SELECT chips_balance, name FROM teams WHERE id = $1", owner_id)
+                payer_name = await _team_name(conn, team_id)
+                toll_paid_msg = f"通行費：經過對方車站，支付 {cost} 枚代幣"
+                toll_received_msg = f"收到通行費 {cost} 枚代幣"
+                await _log(conn, team_id, "team", "toll_paid", station_id=station_id,
+                           chip_delta=-cost, resulting_balance=payer_balance,
+                           message=toll_paid_msg)
+                await _log(conn, owner_id, "team", "toll_received", station_id=station_id,
+                           chip_delta=cost, resulting_balance=owner_row["chips_balance"],
+                           message=toll_received_msg)
+                result = {"status": "toll", "cost": cost}
+                events = [
+                    ("notify_team", team_id, "team_update"),
+                    ("notify_team", owner_id, "team_update"),
+                    ("broadcast_global", "ranking_update"),
+                    _activity_event(team_id, payer_name, "toll_paid", toll_paid_msg, -cost),
+                    _activity_event(owner_id, owner_row["name"], "toll_received", toll_received_msg, cost),
+                ]
             else:
-                claim = await conn.fetchrow("SELECT * FROM station_claims WHERE station_id = $1 FOR UPDATE", station_id)
-                team = await conn.fetchrow("SELECT * FROM teams WHERE id = $1 FOR UPDATE", team_id)
-                cfg = await conn.fetchrow("SELECT * FROM game_config WHERE id = 1")
-                if claim is None or team is None:
-                    raise HTTPException(status_code=404, detail="車站或隊伍不存在")
-
-                if kind == "topup" and claim["owner_team_id"] != team_id:
-                    raise HTTPException(status_code=400, detail="只能對己方車站加碼")
-                if kind == "claim" and claim["owner_team_id"] == team_id:
-                    raise HTTPException(status_code=400, detail="此車站已為己方所有，請使用加碼")
-                # Only top-ups are ever "maxed out" — a claim always gets a fresh
-                # ceiling relative to the current value, so a rival team can
-                # always take a station away no matter how high its value is.
-                if kind == "topup" and claim["value"] >= claim["cap"]:
-                    raise HTTPException(status_code=400, detail="此車站代幣數已達目前上限，無法再加碼")
-
-                if kind == "claim" and claim["owner_team_id"] is not None and team["chips_balance"] < 0:
-                    # Negative-balance team passing through enemy territory: deterministic
-                    # toll, executed immediately with no admin judgment call needed.
-                    cost = claim["value"] + 1
-                    owner_id = claim["owner_team_id"]
-                    await conn.execute("UPDATE teams SET chips_balance = chips_balance - $1 WHERE id = $2", cost, team_id)
-                    await conn.execute("UPDATE teams SET chips_balance = chips_balance + $1 WHERE id = $2", cost, owner_id)
-                    payer_balance = team["chips_balance"] - cost
-                    owner_row = await conn.fetchrow("SELECT chips_balance, name FROM teams WHERE id = $1", owner_id)
-                    payer_name = await _team_name(conn, team_id)
-                    toll_paid_msg = f"通行費：經過對方車站，支付 {cost} 枚代幣"
-                    toll_received_msg = f"收到通行費 {cost} 枚代幣"
-                    await _log(conn, team_id, "team", "toll_paid", station_id=station_id,
-                               chip_delta=-cost, resulting_balance=payer_balance,
-                               message=toll_paid_msg)
-                    await _log(conn, owner_id, "team", "toll_received", station_id=station_id,
-                               chip_delta=cost, resulting_balance=owner_row["chips_balance"],
-                               message=toll_received_msg)
-                    result = {"status": "toll", "cost": cost}
-                    events = [
-                        ("notify_team", team_id, "team_update"),
-                        ("notify_team", owner_id, "team_update"),
-                        ("broadcast_global", "ranking_update"),
-                        _activity_event(team_id, payer_name, "toll_paid", toll_paid_msg, -cost),
-                        _activity_event(owner_id, owner_row["name"], "toll_received", toll_received_msg, cost),
-                    ]
-                else:
-                    min_amount, max_amount = _deposit_bounds(kind, claim["value"], claim["cap"], cfg["max_deposit_per_visit"])
-                    if not (min_amount <= amount <= max_amount):
-                        raise HTTPException(
-                            status_code=400,
-                            detail=f"投入枚數需介於 {min_amount} 到 {max_amount} 之間",
-                        )
-                    req = await conn.fetchrow(
-                        """INSERT INTO approval_requests (kind, team_id, station_id, requested_by, requested_value, status)
-                           VALUES ($1, $2, $3, $4, $5, 'pending') RETURNING *""",
-                        kind, team_id, station_id, requested_by,
-                        json.dumps({"station_value": claim["value"], "owner_team_id": claim["owner_team_id"], "amount": amount}),
+                min_amount, max_amount = _deposit_bounds(kind, claim["value"], claim["cap"], cfg["max_deposit_per_visit"])
+                if not (min_amount <= amount <= max_amount):
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"投入枚數需介於 {min_amount} 到 {max_amount} 之間",
                     )
-                    result = {"status": "pending", "request": dict(req)}
-                    events = [("notify_admin", team_id, "admin_pending")]
+
+                prev_owner = claim["owner_team_id"]
+                before = {"owner_team_id": prev_owner, "value": claim["value"], "cap": claim["cap"]}
+                if kind == "claim":
+                    # Sunk-cost model: the outgoing owner's chips are simply
+                    # overwritten, and the incoming owner gets a fresh ceiling
+                    # based on how much the outgoing owner had accumulated.
+                    new_value = amount
+                    new_cap = claim["value"] + cfg["max_deposit_per_visit"]
+                else:
+                    # Top-up: additive, and the station's ceiling for this
+                    # owner never moves — only a future claim resets it.
+                    new_value = claim["value"] + amount
+                    new_cap = claim["cap"]
+                after = {"owner_team_id": team_id, "value": new_value, "cap": new_cap}
+                await conn.execute(
+                    "UPDATE station_claims SET owner_team_id = $1, value = $2, cap = $3, updated_at = now() WHERE station_id = $4",
+                    team_id, new_value, new_cap, station_id,
+                )
+
+                await conn.execute("UPDATE teams SET chips_balance = chips_balance - $1 WHERE id = $2", amount, team_id)
+                new_balance = team["chips_balance"] - amount
+                action_label = "佔領" if kind == "claim" else "加碼"
+                log_msg = f"{action_label}車站，投入 {amount} 枚代幣（車站代幣數：{new_value}）"
+                await _log(conn, team_id, "team", kind, station_id=station_id,
+                           chip_delta=-amount, resulting_balance=new_balance, message=log_msg)
+                req = await conn.fetchrow(
+                    """INSERT INTO approval_requests (kind, team_id, station_id, requested_by, requested_value, status)
+                       VALUES ($1, $2, $3, $4, $5, 'applied') RETURNING *""",
+                    kind, team_id, station_id, requested_by,
+                    json.dumps({"amount": amount, "before": before, "after": after}),
+                )
+                result = {"status": "applied", "request": dict(req), "deposit": amount}
+                events = [
+                    ("notify_team", team_id, "team_update"),
+                    ("notify_admin", team_id, "admin_pending"),
+                    ("broadcast_global", "map_update"),
+                    ("broadcast_global", "ranking_update"),
+                    _activity_event(team_id, team["name"], kind, log_msg, -amount),
+                ]
+                if prev_owner and prev_owner != team_id:
+                    events.append(("notify_team", prev_owner, "team_update"))
 
     await _fire(events)
     return result
 
 
-async def resolve_action_request(request_id: int, admin_id: int, approve: bool) -> dict:
+async def reverse_action_request(request_id: int, admin_id: int) -> dict:
+    """A team admin rejecting an already-applied claim/top-up: puts the station
+    back exactly as it was and refunds the chips.
+
+    Refuses when the station has moved on since — someone else claimed it, or
+    the same team topped it up again — because restoring the old snapshot
+    would silently wipe whatever happened in between, and a quietly wrong
+    board is worse than an un-undoable mistake. Those cases get fixed by hand
+    with the super admin's 調整代幣 / 釋放車站 controls instead.
+    """
     pool = get_pool()
     result: dict = {}
     events: list[tuple] = []
@@ -231,89 +276,59 @@ async def resolve_action_request(request_id: int, admin_id: int, approve: bool) 
         async with conn.transaction():
             req = await conn.fetchrow("SELECT * FROM approval_requests WHERE id = $1 FOR UPDATE", request_id)
             if req is None:
-                raise HTTPException(status_code=404, detail="找不到此請求")
+                raise HTTPException(status_code=404, detail="找不到此紀錄")
             if req["kind"] not in ("claim", "topup"):
-                raise HTTPException(status_code=400, detail="請求類型錯誤")
-            if req["status"] != "pending":
-                raise HTTPException(status_code=409, detail="此請求已被處理過")
+                raise HTTPException(status_code=400, detail="只有佔領／加碼可以撤銷")
+            if req["status"] == "reversed":
+                raise HTTPException(status_code=409, detail="此紀錄已經被撤銷過了")
+            if req["status"] != "applied":
+                raise HTTPException(status_code=409, detail="此紀錄無法撤銷")
 
-            if not approve:
-                await conn.execute(
-                    "UPDATE approval_requests SET status = 'denied', resolved_by = $1, resolved_at = now() WHERE id = $2",
-                    admin_id, request_id,
+            rv = req["requested_value"]
+            if isinstance(rv, str):
+                rv = json.loads(rv)
+            before, after, amount = rv.get("before"), rv.get("after"), rv.get("amount")
+            if before is None or after is None or amount is None:
+                raise HTTPException(status_code=400, detail="此紀錄缺少還原資訊，無法自動撤銷")
+
+            claim = await conn.fetchrow(
+                "SELECT * FROM station_claims WHERE station_id = $1 FOR UPDATE", req["station_id"]
+            )
+            if (
+                claim["owner_team_id"] != after["owner_team_id"]
+                or claim["value"] != after["value"]
+                or claim["cap"] != after["cap"]
+            ):
+                raise HTTPException(
+                    status_code=409,
+                    detail="此車站在這筆操作之後又被變更過，無法自動撤銷；請改用總管理員的手動調整",
                 )
-                result = {"status": "denied"}
-                events = [("notify_team", req["team_id"], "team_update"), ("notify_admin", req["team_id"], "admin_pending")]
-            else:
-                claim = await conn.fetchrow("SELECT * FROM station_claims WHERE station_id = $1 FOR UPDATE", req["station_id"])
-                cfg = await conn.fetchrow("SELECT * FROM game_config WHERE id = 1")
 
-                rv = req["requested_value"]
-                if isinstance(rv, str):
-                    rv = json.loads(rv)
-                amount = rv.get("amount")
-                min_amount, max_amount = _deposit_bounds(req["kind"], claim["value"], claim["cap"], cfg["max_deposit_per_visit"])
-
-                stale = (
-                    (req["kind"] == "topup" and claim["owner_team_id"] != req["team_id"])
-                    or (req["kind"] == "claim" and claim["owner_team_id"] == req["team_id"])
-                    or (req["kind"] == "topup" and claim["value"] >= claim["cap"])
-                    or amount is None
-                    or not (min_amount <= amount <= max_amount)
-                )
-                if stale:
-                    await conn.execute(
-                        "UPDATE approval_requests SET status = 'stale', resolved_by = $1, resolved_at = now() WHERE id = $2",
-                        admin_id, request_id,
-                    )
-                    result = {"status": "stale"}
-                    events = [("notify_admin", req["team_id"], "admin_pending")]
-                else:
-                    deposit = amount  # what the team actually pays — never trust the tap-time snapshot blindly
-                    new_owner = req["team_id"]
-                    prev_owner = claim["owner_team_id"]
-
-                    if req["kind"] == "claim":
-                        # Sunk-cost model: the outgoing owner's chips are simply
-                        # overwritten, and the incoming owner gets a fresh ceiling
-                        # based on how much the outgoing owner had accumulated.
-                        new_value = amount
-                        new_cap = claim["value"] + cfg["max_deposit_per_visit"]
-                        await conn.execute(
-                            "UPDATE station_claims SET owner_team_id = $1, value = $2, cap = $3, updated_at = now() WHERE station_id = $4",
-                            new_owner, new_value, new_cap, req["station_id"],
-                        )
-                    else:
-                        # Top-up: additive, and the station's ceiling for this
-                        # owner never moves — only a future claim resets it.
-                        new_value = claim["value"] + amount
-                        await conn.execute(
-                            "UPDATE station_claims SET value = $1, updated_at = now() WHERE station_id = $2",
-                            new_value, req["station_id"],
-                        )
-
-                    team = await conn.fetchrow("SELECT chips_balance, name FROM teams WHERE id = $1 FOR UPDATE", new_owner)
-                    await conn.execute("UPDATE teams SET chips_balance = chips_balance - $1 WHERE id = $2", deposit, new_owner)
-                    new_balance = team["chips_balance"] - deposit
-                    action_label = "佔領" if req["kind"] == "claim" else "加碼"
-                    log_msg = f"{action_label}車站，投入 {deposit} 枚代幣（車站代幣數：{new_value}）"
-                    await _log(conn, new_owner, "team", req["kind"], station_id=req["station_id"],
-                               chip_delta=-deposit, resulting_balance=new_balance,
-                               message=log_msg)
-                    await conn.execute(
-                        "UPDATE approval_requests SET status = 'approved', resolved_by = $1, resolved_at = now() WHERE id = $2",
-                        admin_id, request_id,
-                    )
-                    result = {"status": "approved", "deposit": deposit}
-                    events = [
-                        ("notify_team", new_owner, "team_update"),
-                        ("notify_admin", new_owner, "admin_pending"),
-                        ("broadcast_global", "map_update"),
-                        ("broadcast_global", "ranking_update"),
-                        _activity_event(new_owner, team["name"], req["kind"], log_msg, -deposit),
-                    ]
-                    if prev_owner and prev_owner != new_owner:
-                        events.append(("notify_team", prev_owner, "team_update"))
+            await conn.execute(
+                "UPDATE station_claims SET owner_team_id = $1, value = $2, cap = $3, updated_at = now() WHERE station_id = $4",
+                before["owner_team_id"], before["value"], before["cap"], req["station_id"],
+            )
+            team = await conn.fetchrow("SELECT chips_balance, name FROM teams WHERE id = $1 FOR UPDATE", req["team_id"])
+            await conn.execute("UPDATE teams SET chips_balance = chips_balance + $1 WHERE id = $2", amount, req["team_id"])
+            new_balance = team["chips_balance"] + amount
+            action_label = "佔領" if req["kind"] == "claim" else "加碼"
+            reverse_msg = f"隨隊管理員駁回了一筆{action_label}，退還 {amount} 枚代幣"
+            await _log(conn, req["team_id"], "admin", f"{req['kind']}_reversed", station_id=req["station_id"],
+                       chip_delta=amount, resulting_balance=new_balance, message=reverse_msg)
+            await conn.execute(
+                "UPDATE approval_requests SET status = 'reversed', resolved_by = $1, resolved_at = now() WHERE id = $2",
+                admin_id, request_id,
+            )
+            result = {"status": "reversed", "refund": amount}
+            events = [
+                ("notify_team", req["team_id"], "team_update"),
+                ("notify_admin", req["team_id"], "admin_pending"),
+                ("broadcast_global", "map_update"),
+                ("broadcast_global", "ranking_update"),
+                _activity_event(req["team_id"], team["name"], f"{req['kind']}_reversed", reverse_msg, amount),
+            ]
+            if before["owner_team_id"] and before["owner_team_id"] != req["team_id"]:
+                events.append(("notify_team", before["owner_team_id"], "team_update"))
 
     await _fire(events)
     return result

@@ -27,7 +27,11 @@ async def ws_endpoint(websocket: WebSocket, ticket: str):
         else:
             await manager.connect_admin(admin["team_id"], websocket)
     elif kind == "team":
-        team = await pool.fetchrow("SELECT id FROM teams WHERE share_token = $1", value)
+        # Either player-side link — the read-only one needs the same live
+        # updates, it just can't act on them.
+        team = await pool.fetchrow(
+            "SELECT id FROM teams WHERE share_token = $1 OR readonly_share_token = $1", value
+        )
         if team is None:
             await websocket.close(code=4401)
             return

@@ -6,7 +6,7 @@ from auth import AdminIdentity, assert_team_scope, get_current_admin
 from db import get_pool
 from game_logic import (
     get_ranking,
-    resolve_action_request,
+    reverse_action_request,
     resolve_challenge_result,
     resolve_challenge_start,
 )
@@ -44,11 +44,29 @@ async def team_info(team_id: int, admin: AdminIdentity = Depends(get_current_adm
 
 @router.get("/pending", response_model=list[ApprovalRequestOut])
 async def list_pending(team_id: int, admin: AdminIdentity = Depends(get_current_admin)):
+    """The approval queue — challenges only now. Station claims/top-ups apply
+    without approval and show up in /station-actions instead."""
     assert_team_scope(admin, team_id)
     pool = get_pool()
     rows = await pool.fetch(
         "SELECT * FROM approval_requests WHERE team_id = $1 AND status = 'pending' ORDER BY created_at",
         team_id,
+    )
+    return [ApprovalRequestOut(**_normalize_request(r)) for r in rows]
+
+
+@router.get("/station-actions", response_model=list[ApprovalRequestOut])
+async def list_station_actions(team_id: int, limit: int = Query(default=40, le=200),
+                                admin: AdminIdentity = Depends(get_current_admin)):
+    """This team's already-applied claims/top-ups, newest first — the feed the
+    team admin scans and can reject from (POST /deny/{id} reverses one)."""
+    assert_team_scope(admin, team_id)
+    pool = get_pool()
+    rows = await pool.fetch(
+        """SELECT * FROM approval_requests
+           WHERE team_id = $1 AND kind IN ('claim', 'topup') AND status IN ('applied', 'reversed')
+           ORDER BY created_at DESC LIMIT $2""",
+        team_id, limit,
     )
     return [ApprovalRequestOut(**_normalize_request(r)) for r in rows]
 
@@ -70,7 +88,7 @@ async def approve_request(
     assert_team_scope(admin, team_id)
     kind = await _request_kind(request_id)
     if kind in ("claim", "topup"):
-        return await resolve_action_request(request_id, admin.admin_id, approve=True)
+        raise HTTPException(status_code=400, detail="佔領／加碼已自動生效，不需核准")
     if kind == "challenge_start":
         return await resolve_challenge_start(request_id, admin.admin_id, approve=True)
     if kind == "challenge_result":
@@ -85,7 +103,9 @@ async def deny_request(team_id: int, request_id: int, admin: AdminIdentity = Dep
     assert_team_scope(admin, team_id)
     kind = await _request_kind(request_id)
     if kind in ("claim", "topup"):
-        return await resolve_action_request(request_id, admin.admin_id, approve=False)
+        # Already applied, so denying means undoing it — station back to its
+        # prior state, chips refunded (see reverse_action_request).
+        return await reverse_action_request(request_id, admin.admin_id)
     if kind == "challenge_start":
         return await resolve_challenge_start(request_id, admin.admin_id, approve=False)
     # challenge_result requests are auto-created once a start is approved and

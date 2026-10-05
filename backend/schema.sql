@@ -78,6 +78,12 @@ CREATE TABLE IF NOT EXISTS teams (
 -- this was a duplicate that was never actually read for auth.
 ALTER TABLE teams DROP COLUMN IF EXISTS admin_pin_hash;
 
+-- A third link per team: same screens as the player link (share_token) but
+-- it can't claim stations or start challenges. Its own credential rather
+-- than a URL flag on the player link, so handing it out doesn't hand over
+-- the ability to act. Backfilled in migrate.py's _backfill_team_links.
+ALTER TABLE teams ADD COLUMN IF NOT EXISTS readonly_share_token TEXT UNIQUE;
+
 CREATE TABLE IF NOT EXISTS admins (
     id SERIAL PRIMARY KEY,
     team_id INT REFERENCES teams(id),
@@ -204,6 +210,16 @@ CREATE TABLE IF NOT EXISTS approval_requests (
     resolved_by INT REFERENCES admins(id),
     resolved_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Station claims/top-ups no longer wait for approval — they apply on the
+-- spot and the row records something already done ('applied'), which a team
+-- admin can still reject afterwards ('reversed'). See
+-- game_logic.create_action_request / reverse_action_request. Challenge
+-- requests still use pending → approved/denied/stale.
+ALTER TABLE approval_requests DROP CONSTRAINT IF EXISTS approval_requests_status_check;
+ALTER TABLE approval_requests ADD CONSTRAINT approval_requests_status_check CHECK (
+    status IN ('pending', 'approved', 'denied', 'stale', 'applied', 'reversed')
 );
 
 -- A resolved/stale approval_requests row is disposable workflow history, not

@@ -1,7 +1,9 @@
 export type ChallengeType = 'fixed' | 'variable' | 'steal' | 'multiplier'
 export type PoolState = 'queued' | 'active' | 'retired'
 export type RequestKind = 'claim' | 'topup' | 'challenge_start' | 'challenge_result'
-export type RequestStatus = 'pending' | 'approved' | 'denied' | 'stale'
+/** `applied`/`reversed` are the station-claim lifecycle (claims take effect immediately
+ *  and a team admin can reject one afterwards); the rest are the challenge approval flow. */
+export type RequestStatus = 'pending' | 'approved' | 'denied' | 'stale' | 'applied' | 'reversed'
 export type AttemptStatus = 'pending_start_approval' | 'in_progress' | 'success' | 'failed'
 export type GamePhaseName = 'not_started' | 'active' | 'lunch_break' | 'ended' | 'paused'
 
@@ -62,6 +64,8 @@ export interface TeamPublic {
 export interface TeamAdminView extends TeamPublic {
   share_token: string
   admin_share_token: string
+  /** Same screens as the player link but with every action disabled. */
+  readonly_share_token: string | null
 }
 
 export interface TeamSelf {
@@ -184,6 +188,8 @@ export interface TeamState {
   phase: GamePhase
   ranking: TeamPublic[]
   pending_requests: ApprovalRequest[]
+  /** True when the page was opened with the team's read-only link: same screens, no actions. */
+  read_only: boolean
 }
 
 export interface LoginResponse {

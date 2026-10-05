@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { api } from '../api'
+import { ApiError, api } from '../api'
 import ActionLogList from '../components/ActionLogList'
 import GameClock from '../components/GameClock'
 import ChallengeCoordEditor from '../components/ChallengeCoordEditor'
@@ -32,10 +32,25 @@ export default function SuperAdminPage() {
 
   const refresh = useCallback(async () => {
     if (!token) return
-    const [t, c, ch] = await Promise.all([api.listTeams(token), api.getConfig(token), api.listAllChallenges(token)])
-    setTeams(t)
-    setConfig(c)
-    setChallenges(ch)
+    try {
+      const [t, c, ch] = await Promise.all([api.listTeams(token), api.getConfig(token), api.listAllChallenges(token)])
+      setTeams(t)
+      setConfig(c)
+      setChallenges(ch)
+    } catch (e: any) {
+      // A saved-but-dead session (expired, or the DB was reset under it) used
+      // to render this whole dashboard with every fetch failing and no way
+      // back except manually hitting 登出 — so drop it and fall through to
+      // the login form instead. Only on a definite 401: a network blip has no
+      // status and must not throw away a session that's still good.
+      if (e instanceof ApiError && e.status === 401) {
+        clearAdminSession()
+        window.location.reload()
+        return
+      }
+      setError(e.message || '資料載入失敗')
+      return
+    }
     api.globalLog(token).then(setLog).catch(() => {})
     // Station ownership (mapData.claims) backs the teams tab's progress panel
     // too, not just the map/waypoint editors — keep it in lockstep with every
@@ -420,6 +435,9 @@ function TeamRow({
 }) {
   const playerUrl = `${window.location.origin}/team/${team.share_token}`
   const adminUrl = `${window.location.origin}/admin/team/${team.admin_share_token}`
+  const readonlyUrl = team.readonly_share_token
+    ? `${window.location.origin}/team/${team.readonly_share_token}`
+    : null
   return (
     <div className={`bg-white/5 rounded-xl p-3 flex flex-col gap-2 ${!team.active ? 'opacity-50' : ''}`}>
       <div className="flex items-center gap-3">
@@ -462,6 +480,24 @@ function TeamRow({
           </button>
         </div>
       </div>
+
+      {readonlyUrl && (
+        <div>
+          <p className="text-xs text-white/40 mb-1">唯讀連結（可看不能操作）</p>
+          <div className="flex items-center gap-2 bg-black/20 rounded-lg px-2 py-1.5">
+            <a href={readonlyUrl} target="_blank" rel="noreferrer" className="flex-1 text-xs text-emerald-300 truncate">
+              {readonlyUrl}
+            </a>
+            <button
+              type="button"
+              onClick={() => navigator.clipboard.writeText(readonlyUrl)}
+              className="text-xs bg-white/10 rounded px-2 py-1 shrink-0"
+            >
+              複製連結
+            </button>
+          </div>
+        </div>
+      )}
 
       <div>
         <p className="text-xs text-white/40 mb-1">管理員連結（只給該隊隨隊管理員，請勿外流）</p>

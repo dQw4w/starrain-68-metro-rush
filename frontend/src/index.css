@@ -15,6 +15,28 @@ body {
   overscroll-behavior: none;
 }
 
+/* The player page is a fixed app shell, not a scrolling document. `100vh` on
+   iOS means the *large* viewport (browser toolbars hidden), so with Chrome's
+   toolbars showing the shell is taller than what you can see — the document
+   then scrolls and takes the header (team name / chips / clock) up under the
+   URL bar, which is awkward to get back. Safari hides its toolbar on scroll
+   so it papers over the same bug. `100dvh` is the *current* viewport, so the
+   shell always fits exactly and there is nothing to scroll. */
+.app-viewport {
+  height: 100vh;
+}
+
+@supports (height: 100dvh) {
+  .app-viewport {
+    height: 100dvh;
+  }
+}
+
+/* Keeps the bottom bar clear of the home indicator / Chrome's toolbar inset. */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
 /* Leaflet tiles must sit under our UI chrome but above the page background */
 .leaflet-container {
   background: #0f172a;

@@ -17,6 +17,8 @@ interface Props {
   teams: TeamPublic[]
   myTeamId: number
   hasPendingRequest: boolean
+  /** Read-only link: the task content still shows, but nothing can be started or submitted. */
+  readOnly?: boolean
   /** % reward bonus per prior team that failed this challenge. */
   failBonusStepPct: number
   onClose: () => void
@@ -32,6 +34,7 @@ export default function ChallengeModal({
   teams,
   myTeamId,
   hasPendingRequest,
+  readOnly = false,
   failBonusStepPct,
   onClose,
   onStart,
@@ -113,7 +116,7 @@ export default function ChallengeModal({
 
         {error && <p className="text-rose-400 text-sm mt-3">{error}</p>}
 
-        {!attempt && !hasPendingRequest && (
+        {!attempt && !hasPendingRequest && !readOnly && (
           <div className="mt-4 flex flex-col gap-3">
             {teaser.type === 'steal' && (
               <label className="text-sm">
@@ -146,6 +149,10 @@ export default function ChallengeModal({
           <p className="mt-4 text-amber-300 font-medium">⏳ 等待隨隊管理員核准開始任務…</p>
         )}
 
+        {readOnly && !attempt && !hasPendingRequest && (
+          <p className="mt-4 text-white/50 text-sm">唯讀連結：只能檢視，無法挑戰任務。</p>
+        )}
+
         {attempt && attempt.status === 'in_progress' && (
           <div className="mt-4 flex flex-col gap-3">
             {fullDetail && fullDetail.image_url && (
@@ -168,7 +175,7 @@ export default function ChallengeModal({
               {fullDetail ? fullDetail.description : '任務內容載入中…'}
             </div>
 
-            {teaser.type === 'variable' && attempt.called_shot_value == null ? (
+            {teaser.type === 'variable' && attempt.called_shot_value == null && !readOnly ? (
               <label className="text-sm">
                 喊出目標數量（必填）—— 欲挑戰的「{unitLabel}」數量（非代幣數量），須為正整數
                 <input
