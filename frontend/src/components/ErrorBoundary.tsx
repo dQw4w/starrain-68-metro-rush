@@ -28,7 +28,7 @@ export default class ErrorBoundary extends Component<Props, State> {
   render() {
     if (this.state.error) {
       return (
-        <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center gap-5 px-6 text-center">
+        <div className="app-viewport-min bg-slate-900 flex flex-col items-center justify-center gap-5 px-6 text-center">
           <p className="text-white font-black text-xl">糟糕，出了一點問題</p>
           <pre className="text-red-300/70 text-xs max-w-full overflow-auto bg-black/30 rounded-xl p-3 max-h-40">
             {this.state.error.message}

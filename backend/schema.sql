@@ -78,11 +78,12 @@ CREATE TABLE IF NOT EXISTS teams (
 -- this was a duplicate that was never actually read for auth.
 ALTER TABLE teams DROP COLUMN IF EXISTS admin_pin_hash;
 
--- A third link per team: same screens as the player link (share_token) but
--- it can't claim stations or start challenges. Its own credential rather
--- than a URL flag on the player link, so handing it out doesn't hand over
--- the ability to act. Backfilled in migrate.py's _backfill_team_links.
-ALTER TABLE teams ADD COLUMN IF NOT EXISTS readonly_share_token TEXT UNIQUE;
+-- The read-only view briefly had its own token here. It's now just a second
+-- path on the same share_token (/team/:token/view), because the point was
+-- never secrecy — it's so only one team member drives and the rest watch
+-- without fighting over the same actions. A separate token also broke the
+-- team-scoped challenge-detail endpoint, which only ever matched share_token.
+ALTER TABLE teams DROP COLUMN IF EXISTS readonly_share_token;
 
 CREATE TABLE IF NOT EXISTS admins (
     id SERIAL PRIMARY KEY,

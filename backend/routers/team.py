@@ -32,28 +32,11 @@ router = APIRouter(prefix="/api/team/{token}", tags=["team"])
 
 
 async def _team_by_token(token: str):
-    """Resolves either of a team's two player-side links. The read-only link
-    sees exactly the same screens; it just can't act (see _writable_team)."""
     pool = get_pool()
-    row = await pool.fetchrow(
-        "SELECT * FROM teams WHERE share_token = $1 OR readonly_share_token = $1", token
-    )
+    row = await pool.fetchrow("SELECT * FROM teams WHERE share_token = $1", token)
     if row is None:
         raise HTTPException(status_code=404, detail="找不到此隊伍連結")
     return row
-
-
-def _is_read_only(team, token: str) -> bool:
-    return team["readonly_share_token"] == token and team["share_token"] != token
-
-
-async def _writable_team(token: str):
-    """Same as _team_by_token, but refuses the read-only link — every endpoint
-    that changes something goes through this."""
-    team = await _team_by_token(token)
-    if _is_read_only(team, token):
-        raise HTTPException(status_code=403, detail="此連結為唯讀連結，無法進行操作")
-    return team
 
 
 def _normalize_request(r) -> dict:
@@ -73,7 +56,7 @@ async def team_state(token: str):
         team=TeamSelf(
             id=team["id"], name=team["name"], color_hex=team["color_hex"],
             meeting_station_id=team["meeting_station_id"], chips_balance=team["chips_balance"],
-            share_token=token,
+            share_token=team["share_token"],
         ),
         phase=GamePhase(**phase),
         ranking=[
@@ -84,7 +67,6 @@ async def team_state(token: str):
             for r in ranking
         ],
         pending_requests=[ApprovalRequestOut(**_normalize_request(r)) for r in pending],
-        read_only=_is_read_only(team, token),
     )
 
 
@@ -111,13 +93,13 @@ async def team_log(token: str, action_type: str | None = Query(default=None), li
 
 @router.post("/action", response_model=dict)
 async def team_action(token: str, body: ClaimRequestCreate):
-    team = await _writable_team(token)
+    team = await _team_by_token(token)
     return await create_action_request(team["id"], body.station_id, body.kind, body.requested_by, body.amount)
 
 
 @router.post("/challenge/{challenge_id}/start", response_model=dict)
 async def challenge_start(token: str, challenge_id: int, body: ChallengeStartRequest):
-    team = await _writable_team(token)
+    team = await _team_by_token(token)
     return await create_challenge_start_request(
         team["id"], challenge_id, body.target_team_id, body.requested_by
     )
@@ -126,7 +108,7 @@ async def challenge_start(token: str, challenge_id: int, body: ChallengeStartReq
 @router.post("/challenge/{challenge_id}/submit-shot", response_model=dict)
 async def challenge_submit_shot(token: str, challenge_id: int, body: ChallengeShotSubmit):
     """Call-your-shot (variable) challenges only — see submit_challenge_shot."""
-    team = await _writable_team(token)
+    team = await _team_by_token(token)
     return await submit_challenge_shot(team["id"], challenge_id, body.called_shot_value)
 
 
@@ -140,9 +122,7 @@ async def my_attempts(token: str):
 
 @router.post("/gps")
 async def gps_ping(token: str, body: GpsPing):
-    # A read-only viewer isn't walking with the team, so their position would
-    # just be noise on the admin's GPS map.
-    team = await _writable_team(token)
+    team = await _team_by_token(token)
     pool = get_pool()
     await pool.execute(
         """INSERT INTO device_positions (team_id, device_id, lat, lng, updated_at)

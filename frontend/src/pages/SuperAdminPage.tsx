@@ -95,7 +95,7 @@ export default function SuperAdminPage() {
   const ranking = [...teams].sort((a, b) => b.stations_owned - a.stations_owned || b.chips_balance - a.chips_balance)
 
   return (
-    <div className="min-h-screen bg-slate-900 text-white flex flex-col">
+    <div className="app-viewport bg-slate-900 text-white flex flex-col">
       <ToastStack toasts={toasts} />
       <header className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-3 bg-slate-800">
         <h1 className="font-black text-lg flex-1">Metro Rush｜總管理員</h1>
@@ -199,7 +199,7 @@ function SuperAdminLoginForm() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-900 text-white flex items-center justify-center p-4">
+    <div className="app-viewport bg-slate-900 text-white flex items-center justify-center p-4">
       <form onSubmit={handleSubmit} className="bg-slate-800 rounded-2xl p-6 w-full max-w-sm flex flex-col gap-4">
         <h1 className="text-2xl font-black text-center">Metro Rush 總管理員登入</h1>
         <p className="text-white/50 text-sm text-center">
@@ -435,9 +435,8 @@ function TeamRow({
 }) {
   const playerUrl = `${window.location.origin}/team/${team.share_token}`
   const adminUrl = `${window.location.origin}/admin/team/${team.admin_share_token}`
-  const readonlyUrl = team.readonly_share_token
-    ? `${window.location.origin}/team/${team.readonly_share_token}`
-    : null
+  // Same token as the player link, just the view-only route.
+  const readonlyUrl = `${playerUrl}/view`
   return (
     <div className={`bg-white/5 rounded-xl p-3 flex flex-col gap-2 ${!team.active ? 'opacity-50' : ''}`}>
       <div className="flex items-center gap-3">
@@ -481,23 +480,21 @@ function TeamRow({
         </div>
       </div>
 
-      {readonlyUrl && (
-        <div>
-          <p className="text-xs text-white/40 mb-1">唯讀連結（可看不能操作）</p>
-          <div className="flex items-center gap-2 bg-black/20 rounded-lg px-2 py-1.5">
-            <a href={readonlyUrl} target="_blank" rel="noreferrer" className="flex-1 text-xs text-emerald-300 truncate">
-              {readonlyUrl}
-            </a>
-            <button
-              type="button"
-              onClick={() => navigator.clipboard.writeText(readonlyUrl)}
-              className="text-xs bg-white/10 rounded px-2 py-1 shrink-0"
-            >
-              複製連結
-            </button>
-          </div>
+      <div>
+        <p className="text-xs text-white/40 mb-1">唯讀連結（給其他隊員跟著看，不會誤觸操作）</p>
+        <div className="flex items-center gap-2 bg-black/20 rounded-lg px-2 py-1.5">
+          <a href={readonlyUrl} target="_blank" rel="noreferrer" className="flex-1 text-xs text-emerald-300 truncate">
+            {readonlyUrl}
+          </a>
+          <button
+            type="button"
+            onClick={() => navigator.clipboard.writeText(readonlyUrl)}
+            className="text-xs bg-white/10 rounded px-2 py-1 shrink-0"
+          >
+            複製連結
+          </button>
         </div>
-      )}
+      </div>
 
       <div>
         <p className="text-xs text-white/40 mb-1">管理員連結（只給該隊隨隊管理員，請勿外流）</p>

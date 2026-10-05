@@ -10,6 +10,11 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/team/:token" element={<TeamPage />} />
+          {/* Same token, view-only. Not a security boundary — anyone here can
+              drop the /view and act. It exists so one team member drives and
+              everyone else can follow along without racing them into the same
+              claim or challenge. */}
+          <Route path="/team/:token/view" element={<TeamPage readOnly />} />
           {/* :idOrToken is a numeric team_id (super admin, uses their own Bearer
               session) OR a team's permanent admin_share_token (works on its own,
               no login) — TeamAdminPage figures out which. */}

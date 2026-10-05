@@ -140,7 +140,7 @@ export default function TeamAdminPage() {
 
   if (linkError) {
     return (
-      <div className="h-screen flex flex-col items-center justify-center gap-2 bg-slate-900 text-white text-center px-6">
+      <div className="app-viewport flex flex-col items-center justify-center gap-2 bg-slate-900 text-white text-center px-6">
         <p className="font-bold text-rose-400">{linkError}</p>
         <p className="text-white/50 text-sm">請向總管理員確認連結是否正確或已更新。</p>
       </div>
@@ -149,14 +149,14 @@ export default function TeamAdminPage() {
 
   if (!teamInfo) {
     return (
-      <div className="h-screen flex items-center justify-center bg-slate-900 text-white">
+      <div className="app-viewport flex items-center justify-center bg-slate-900 text-white">
         <p>載入中…</p>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-slate-900 text-white flex flex-col">
+    <div className="app-viewport bg-slate-900 text-white flex flex-col">
       <ToastStack toasts={toasts} />
       <header className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-3 bg-slate-800">
         <span className="w-3.5 h-3.5 rounded-full" style={{ backgroundColor: teamInfo.color_hex }} />

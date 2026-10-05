@@ -24,7 +24,7 @@ import type {
 
 type Tab = 'ranking' | 'challenges' | 'log'
 
-export default function TeamPage() {
+export default function TeamPage({ readOnly = false }: { readOnly?: boolean }) {
   const { token } = useParams<{ token: string }>()
   const [state, setState] = useState<TeamState | null>(null)
   const [mapData, setMapData] = useState<MapData | null>(null)
@@ -118,7 +118,7 @@ export default function TeamPage() {
   // link — that viewer isn't walking with the team, so their position would
   // just be noise on the admin's GPS map (the endpoint rejects it anyway).
   useEffect(() => {
-    if (!token || state?.read_only || !('geolocation' in navigator)) return
+    if (!token || readOnly || !('geolocation' in navigator)) return
     const deviceId = getDeviceId()
     const watchId = navigator.geolocation.watchPosition(
       (pos) => {
@@ -128,7 +128,7 @@ export default function TeamPage() {
       { enableHighAccuracy: false, maximumAge: 15000, timeout: 10000 }
     )
     return () => navigator.geolocation.clearWatch(watchId)
-  }, [token, state?.read_only])
+  }, [token, readOnly])
 
   // Pop the in-progress challenge open by itself, so nobody has to go hunting
   // for the pin to read the task. The read-only link does this every time an
@@ -138,7 +138,6 @@ export default function TeamPage() {
   const autoOpenedChallengeRef = useRef<number | null>(null)
   const playerAutoOpenDoneRef = useRef(false)
   const inProgressAttempt = myAttempts.find((a) => a.status === 'in_progress')
-  const readOnlyState = state?.read_only
   useEffect(() => {
     if (!inProgressAttempt) {
       autoOpenedChallengeRef.current = null
@@ -147,7 +146,7 @@ export default function TeamPage() {
     // Already opened this particular attempt — don't fight the viewer if
     // they've closed it.
     if (autoOpenedChallengeRef.current === inProgressAttempt.challenge_id) return
-    if (!readOnlyState) {
+    if (!readOnly) {
       if (playerAutoOpenDoneRef.current) return
       playerAutoOpenDoneRef.current = true
     }
@@ -155,7 +154,7 @@ export default function TeamPage() {
     if (!ch) return
     autoOpenedChallengeRef.current = inProgressAttempt.challenge_id
     setSelectedChallenge(ch)
-  }, [inProgressAttempt, challenges, readOnlyState])
+  }, [inProgressAttempt, challenges, readOnly])
 
   // Cleared only when switching challenges (not on every attempt-status
   // refetch below) so a stale previous challenge's detail never flashes.
@@ -178,14 +177,13 @@ export default function TeamPage() {
   if (!token) return null
   if (!state || !mapData) {
     return (
-      <div className="h-screen flex items-center justify-center bg-slate-900 text-white">
+      <div className="app-viewport flex items-center justify-center bg-slate-900 text-white">
         <p>載入中…</p>
       </div>
     )
   }
 
   const myTeam = state.team
-  const readOnly = state.read_only
   const pendingChallengeRequest = state.pending_requests.find(
     (r) => r.kind === 'challenge_start' && r.challenge_id === selectedChallenge?.id
   )

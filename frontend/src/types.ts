@@ -64,8 +64,6 @@ export interface TeamPublic {
 export interface TeamAdminView extends TeamPublic {
   share_token: string
   admin_share_token: string
-  /** Same screens as the player link but with every action disabled. */
-  readonly_share_token: string | null
 }
 
 export interface TeamSelf {
@@ -188,8 +186,6 @@ export interface TeamState {
   phase: GamePhase
   ranking: TeamPublic[]
   pending_requests: ApprovalRequest[]
-  /** True when the page was opened with the team's read-only link: same screens, no actions. */
-  read_only: boolean
 }
 
 export interface LoginResponse {

@@ -2,17 +2,41 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Height chain, worst → best. `height:100%` on html resolves against iOS's
+   LARGE viewport (toolbars hidden), which is what let the document scroll
+   and hide the header; 100dvh and the JS-measured --app-vh are the current
+   visible height. See src/lib/viewportHeight.ts. */
 html, body, #root {
   height: 100%;
   margin: 0;
 }
 
+@supports (height: 100dvh) {
+  html, body, #root {
+    height: 100dvh;
+  }
+}
+
+html, body, #root {
+  height: var(--app-vh, 100%);
+}
+
+/* The whole app is a fixed shell with its own internal scroll panes — the
+   document itself must never scroll, or iOS drags the UI under the browser
+   chrome. `position: fixed` on body is the one thing iOS reliably honours. */
+html, body {
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
 body {
+  position: fixed;
+  inset: 0;
+  width: 100%;
   background: #0f172a;
   color: white;
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
-  overscroll-behavior: none;
 }
 
 /* The player page is a fixed app shell, not a scrolling document. `100vh` on
@@ -26,11 +50,17 @@ body {
   height: 100vh;
 }
 
-@supports (height: 100dvh) {
-  .app-viewport {
-    height: 100dvh;
-  }
+.app-viewport-min {
+  min-height: 100vh;
 }
+
+@supports (height: 100dvh) {
+  .app-viewport { height: 100dvh; }
+  .app-viewport-min { min-height: 100dvh; }
+}
+
+.app-viewport { height: var(--app-vh, 100vh); }
+.app-viewport-min { min-height: var(--app-vh, 100vh); }
 
 /* Keeps the bottom bar clear of the home indicator / Chrome's toolbar inset. */
 .pb-safe {
