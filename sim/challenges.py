@@ -12,6 +12,7 @@ tune after rewards.
 """
 from __future__ import annotations
 
+import math
 import random
 from dataclasses import dataclass
 from typing import Callable
@@ -42,9 +43,31 @@ class ChallengeProfile:
 
 
 def _decay(base: float, per_unit: float, floor: float = 0.02):
-    """p = base * per_unit^(n - n0), the usual 'each extra unit is harder'."""
+    """p(n) = base * per_unit^(n-1): `base` is the pass rate for calling 1,
+    and each extra unit multiplies by `per_unit`.
+
+    Anchored at n=1, not n=0 — calling the minimum should give you `base`.
+    (It used to decay from 0, which quietly turned a "nearly free" 0.97 base
+    into a 0.53 coin flip at n=1 and made every call-your-shot look far
+    harder than intended.)"""
     def f(n: int, _b=base, _p=per_unit, _f=floor) -> float:
-        return max(_f, _b * (_p ** max(0, n)))
+        return max(_f, _b * (_p ** max(0, n - 1)))
+    return f
+
+
+def _beats_the_clock(minutes_per_unit: float, limit: float, spread: float = 1.2,
+                      ceiling: float = 0.97, floor: float = 0.02):
+    """For a task that's purely 'can you fit n repetitions into a time limit'.
+
+    p(n) is a logistic on the slack left over (limit - n * minutes_per_unit),
+    so it's flat while there's room, falls off a cliff right where the clock
+    runs out, and bottoms out past it. A geometric decay can't express that
+    shape — it makes 'obviously impossible' look merely unlikely.
+    """
+    def f(n: int) -> float:
+        slack = limit - n * minutes_per_unit
+        p = 1 / (1 + math.exp(-slack / spread))
+        return max(floor, min(ceiling, p))
     return f
 
 
@@ -67,12 +90,21 @@ PROFILES: dict[str, ChallengeProfile] = {
     "台北地下街任務": ChallengeProfile(mean_minutes=22, sd_minutes=6, success=0.45),
     # One guess at the right brunch shop near 葫洲.
     "葫洲站任務": ChallengeProfile(mean_minutes=12, sd_minutes=4, success=0.5),
-    # n round trips up the Miramar stairs in 10 minutes, whole team in sync.
+    # Relay up the Miramar stairs in 10 minutes: one leg per person, nobody
+    # twice, order fixed up front.
+    #
+    # call_range's ceiling IS the team's headcount — one leg each means they
+    # can never call more than that, so set it to your real team size. It
+    # also caps this challenge's payout at headcount x chips_per_unit, which
+    # is the single biggest reward in the game at 6 people (300 chips).
     "美麗華任務": ChallengeProfile(
         mean_minutes=16, sd_minutes=3,
         call_range=(1, 6),
-        # 1 trip is nearly free, 3 is a push, 5+ needs athletes.
-        success_fn=_decay(0.97, 0.55),
+        # The wheel is on 5F, so a leg is four floors up and four down —
+        # about 2 minutes at a normal pace including the handover. Against a
+        # 10-minute limit that puts the cliff at 5 legs: 4 is comfortable, 5
+        # is a coin flip, 6 means everyone sprints and someone gasses out.
+        success_fn=_beats_the_clock(minutes_per_unit=2.0, limit=10.0),
     ),
     # DDR: clear a self-declared difficulty level on a 星/雨/star/rain song.
     "明曜百貨任務": ChallengeProfile(

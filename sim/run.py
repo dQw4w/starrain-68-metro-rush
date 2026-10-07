@@ -19,7 +19,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from agent import HeuristicAgent, LLMAgent  # noqa: E402
+from agent import ExplorerAgent, HeuristicAgent, LLMAgent  # noqa: E402
 from config import SimConfig  # noqa: E402
 from engine import Engine  # noqa: E402
 from llm import LLMClient, LLMConfig  # noqa: E402
@@ -30,6 +30,9 @@ def play_one(cfg: SimConfig, agent_kind: str, llm_cfg: LLMConfig, seed: int):
     rng = random.Random(seed)
     net = Network(cfg)
     heuristic = HeuristicAgent(rng)
+    if agent_kind == "explorer":
+        explorer = ExplorerAgent(rng)
+        return Engine(cfg, net, {n: explorer for n in cfg.starting_chips}, rng).run()
     if agent_kind == "llm":
         client = LLMClient(llm_cfg)
         agents = {
@@ -65,11 +68,12 @@ def summarise(results, label: str) -> dict:
 def main() -> None:
     ap = argparse.ArgumentParser(description="Metro Rush parameter-tuning simulator")
     ap.add_argument("--games", type=int, default=10)
-    ap.add_argument("--agent", choices=["heuristic", "llm"], default="heuristic")
+    ap.add_argument("--agent", choices=["heuristic", "explorer", "llm"], default="explorer")
     ap.add_argument("--minutes", type=int, default=None, help="override game length")
     ap.add_argument("--seed", type=int, default=0)
-    ap.add_argument("--base-url", default="http://localhost:11434/v1",
-                    help="ollama http://localhost:11434/v1 | lm studio http://localhost:1234/v1")
+    ap.add_argument("--base-url", default="http://127.0.0.1:11434/v1",
+                    help="ollama http://127.0.0.1:11434/v1 | lm studio http://127.0.0.1:1234/v1. "
+                         "Use 127.0.0.1, not localhost — see llm.py.")
     ap.add_argument("--model", default="qwen2.5:7b")
     ap.add_argument("--temperature", type=float, default=0.7)
     ap.add_argument("--verbose", action="store_true", help="print every prompt and reply")

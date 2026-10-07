@@ -19,10 +19,12 @@ from dataclasses import dataclass, field
 CROSS_PLATFORM_TRANSFERS: set[str] = {
     "古亭",        # 中和新蘆線 ↔ 松山新店線
     "東門",        # 中和新蘆線 ↔ 淡水信義線
-    "民權西路",    # 淡水信義線 ↔ 中和新蘆線
+    # "民權西路",    # 淡水信義線 ↔ 中和新蘆線
     "大橋頭",      # 中和新蘆線 ↔ 蘆洲支線
     "七張",        # 松山新店線 ↔ 小碧潭支線
     "北投",        # 淡水信義線 ↔ 新北投支線
+    "西門",        # 
+    "中正紀念堂",  # 
 }
 
 
@@ -31,7 +33,7 @@ class SimConfig:
     # --- what we're tuning -------------------------------------------------
     #: Starting chips per team, keyed by the team label used in results.
     starting_chips: dict[str, int] = field(
-        default_factory=lambda: {"科技大樓隊": 50, "公館隊": 50}
+        default_factory=lambda: {"科技大樓隊": 25, "公館隊": 25}
     )
     #: Where each team begins, as a station name from seed_stations.py.
     start_stations: dict[str, str] = field(
@@ -45,10 +47,22 @@ class SimConfig:
     game_minutes: int = 6 * 60
     max_deposit_per_visit: int = 5
     fail_bonus_step_pct: float = 10.0
-    #: The real pool reveals 3 and refills. Tuning is much less noisy with
-    #: everything visible from the start, which is also what the superadmin's
-    #: 上架所有任務 button does.
-    all_challenges_active: bool = True
+    #: True  → every challenge is on the map from minute 0, which is what the
+    #:          superadmin's 上架所有任務 button does. Much less noisy to tune
+    #:          against, because results don't depend on the reveal order.
+    #: False → mirror the live pool: start with `challenge_pool_initial`
+    #:          fixed-reward challenges revealed, and reveal
+    #:          `challenge_pool_refill` more each time one is completed.
+    all_challenges_active: bool = False
+    challenge_pool_initial: int = 3
+    challenge_pool_refill: int = 2
+    #: Pin exactly which challenges start revealed, by name, instead of
+    #: letting the opening pool be drawn at random from the fixed-reward
+    #: ones. Use this to make sure each team has something within reach at
+    #: minute 0 — a random opening draw can put all three on the far side of
+    #: the city and leave both teams with nothing to do but claim stations.
+    #: None = keep the live behaviour (random fixed-reward draw).
+    initial_active_challenges: list[str] | None = None
 
     # --- transit model -----------------------------------------------------
     minutes_per_segment: int = 2

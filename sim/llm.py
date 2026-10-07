@@ -3,8 +3,13 @@
 Ollama and LM Studio both serve an OpenAI-compatible /v1/chat/completions,
 so one client covers both — only the base URL and model name differ:
 
-    ollama     http://localhost:11434/v1   (model e.g. "qwen2.5:7b")
-    lm studio  http://localhost:1234/v1    (model = whatever is loaded)
+    ollama     http://127.0.0.1:11434/v1   (model e.g. "qwen2.5:7b")
+    lm studio  http://127.0.0.1:1234/v1    (model = whatever is loaded)
+
+Note the literal 127.0.0.1 rather than "localhost": on macOS localhost
+resolves to ::1 first, and anything else holding that port on IPv6 (a stray
+Docker publish, say) silently swallows the request — which shows up as a
+baffling "model not found" for a model you definitely pulled.
 
 stdlib only, so `sim/` needs nothing installed beyond Python.
 """
@@ -19,7 +24,7 @@ from dataclasses import dataclass
 
 @dataclass
 class LLMConfig:
-    base_url: str = "http://localhost:11434/v1"
+    base_url: str = "http://127.0.0.1:11434/v1"
     model: str = "qwen2.5:7b"
     temperature: float = 0.7
     timeout_s: float = 120.0
@@ -56,6 +61,11 @@ class LLMClient:
         try:
             with urllib.request.urlopen(req, timeout=self.cfg.timeout_s) as r:
                 body = json.loads(r.read())
+        except urllib.error.HTTPError as e:
+            # The server's body is the useful part — a 404 here is almost
+            # always "model not found", i.e. you haven't pulled it yet.
+            detail = e.read().decode(errors="replace")[:300]
+            raise LLMError(f"HTTP {e.code} from {self.cfg.base_url}: {detail}") from e
         except urllib.error.URLError as e:
             raise LLMError(f"local model unreachable at {self.cfg.base_url}: {e}") from e
         self.calls += 1

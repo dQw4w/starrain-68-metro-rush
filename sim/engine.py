@@ -22,22 +22,32 @@ from network import ChallengeSite, Network
 
 @dataclass
 class Option:
-    key: str                      # 'claim' | 'topup' | 'board' | 'stay_on' | 'walk' | 'wait'
-    label: str                    # what the agent reads
-    minutes: int                  # time this burns
+    """A movement choice. Claiming is not one of these — you tap your phone
+    while standing on the platform, so it happens alongside whatever you do
+    next rather than instead of it (see ClaimOffer / Decision.claim_amount)."""
+    key: str                      # 'board' | 'stay_on' | 'walk' | 'wait'
+    label: str
+    minutes: int
     line: str | None = None
     direction: int | None = None
     to_station: str | None = None
     challenge: str | None = None
-    amount: int | None = None     # claim/top-up chips
     call_range: tuple[int, int] | None = None   # call-your-shot bounds
 
 
 @dataclass
+class ClaimOffer:
+    kind: str                     # 'claim' | 'topup'
+    lo: int
+    hi: int
+    label: str
+
+
+@dataclass
 class Decision:
-    option_index: int
+    option_index: int             # index into the movement options
+    claim_amount: int = 0         # 0 = don't claim/top-up this turn
     call_value: int | None = None
-    amount: int | None = None
     notes: str = ""
 
 
@@ -57,6 +67,9 @@ class TeamState:
     challenge_call: int | None = None
     notes: str = ""
     attempted: set[str] = field(default_factory=set)
+    #: Last few stations stood at — fed back so the agent can see itself
+    #: ping-ponging between the same two stations.
+    recent_stations: list[str] = field(default_factory=list)
     llm_calls: int = 0
     log: list[str] = field(default_factory=list)
 
@@ -91,8 +104,26 @@ class Engine:
             for name in cfg.starting_chips
         }
         self.claims: dict[str, StationClaim] = {s: StationClaim() for s in net.all_stations}
-        # name -> 'active' | 'retired'
-        self.challenge_state = {c.name: "active" for c in net.challenges}
+        # name -> 'active' | 'queued' | 'retired'
+        if cfg.all_challenges_active:
+            self.challenge_state = {c.name: "active" for c in net.challenges}
+        else:
+            # Mirror activate_initial_pool(): the opening reveal is
+            # fixed-reward challenges only, the rest wait in the backlog.
+            self.challenge_state = {c.name: "queued" for c in net.challenges}
+            if cfg.initial_active_challenges:
+                known = {c.name for c in net.challenges}
+                for name in cfg.initial_active_challenges:
+                    if name not in known:
+                        raise ValueError(
+                            f"initial_active_challenges 裡的「{name}」不存在於 seed_challenges.py"
+                        )
+                    self.challenge_state[name] = "active"
+            else:
+                fixed = [c.name for c in net.challenges if c.type == "fixed"]
+                rng.shuffle(fixed)
+                for name in fixed[: cfg.challenge_pool_initial]:
+                    self.challenge_state[name] = "active"
         self.challenge_fails: dict[str, int] = {c.name: 0 for c in net.challenges}
 
     # --- helpers -----------------------------------------------------------
@@ -118,6 +149,28 @@ class Engine:
 
     # --- option building ---------------------------------------------------
 
+    def claim_offer(self, team: TeamState) -> ClaimOffer | None:
+        """What this team could pay into the station it's standing at, right
+        now. Costs chips but no time — it happens while they're waiting for
+        the train — so it's offered alongside the movement choice, not
+        instead of it."""
+        claim = self.claims[team.station]
+        if claim.owner == team.name:
+            lo, hi = self._deposit_bounds("topup", claim)
+            hi = min(hi, team.chips)
+            if hi < lo:
+                return None
+            return ClaimOffer("topup", lo, hi,
+                              f"在「{team.station}」加碼（目前 {claim.value}/{claim.cap}，"
+                              f"可投入 {lo}~{hi} 枚；加碼不會增加車站數，只是讓對手更難搶）")
+        lo, hi = self._deposit_bounds("claim", claim)
+        hi = min(hi, team.chips)
+        if hi < lo:
+            return None
+        held = "目前無人佔領" if claim.owner is None else f"目前是 {claim.owner} 的，站上 {claim.value} 枚"
+        return ClaimOffer("claim", lo, hi,
+                          f"佔領「{team.station}」（{held}；投入 {lo}~{hi} 枚，車站數 +1）")
+
     def options_for(self, team: TeamState) -> list[Option]:
         cfg, net = self.cfg, self.net
         opts: list[Option] = []
@@ -128,30 +181,11 @@ class Engine:
             if nxt is not None:
                 opts.append(Option(
                     key="stay_on",
-                    label=f"留在車上，繼續搭 {net.line_names.get(team.line, team.line)} 到「{nxt}」",
+                    label=(f"留在車上，繼續搭 {net.line_names.get(team.line, team.line)} 到"
+                           f"「{nxt}」{self._station_tag(nxt, team)}"
+                           f"{self._lookahead(team.station, team.line, team.direction, team)}"),
                     minutes=cfg.minutes_per_segment,
                     line=team.line, direction=team.direction, to_station=nxt,
-                ))
-
-        claim = self.claims[team.station]
-        if claim.owner == team.name:
-            lo, hi = self._deposit_bounds("topup", claim)
-            if hi >= lo and team.chips >= lo:
-                amount = min(hi, team.chips)
-                opts.append(Option(
-                    key="topup",
-                    label=f"在「{team.station}」加碼 {lo}~{min(hi, team.chips)} 枚（目前 {claim.value}/{claim.cap}）",
-                    minutes=cfg.claim_minutes, amount=amount,
-                ))
-        else:
-            lo, hi = self._deposit_bounds("claim", claim)
-            if team.chips >= lo:
-                amount = min(hi, team.chips)
-                held = f"（目前 {claim.owner or '無人'} 持有，站上 {claim.value} 枚）"
-                opts.append(Option(
-                    key="claim",
-                    label=f"佔領「{team.station}」，投入 {lo}~{min(hi, team.chips)} 枚 {held}",
-                    minutes=cfg.claim_minutes, amount=amount,
                 ))
 
         for line, direction, nxt in net.ride_options(team.station):
@@ -162,26 +196,86 @@ class Engine:
             cost = net.board_cost(team.station, team.line if team.mode == "riding" else None, line)
             opts.append(Option(
                 key="board",
-                label=f"搭 {net.line_names.get(line, line)} 往「{net.terminus(line, direction)}」方向，下一站「{nxt}」",
+                label=(f"搭 {net.line_names.get(line, line)} 往「{net.terminus(line, direction)}」方向，"
+                       f"下一站「{nxt}」{self._station_tag(nxt, team)}"
+                       f"{self._lookahead(team.station, line, direction, team)}"),
                 minutes=cost + cfg.minutes_per_segment,
                 line=line, direction=direction, to_station=nxt,
             ))
 
-        for ch, walk in net.nearest_challenges(
+        walk_opts: list[Option] = []
+        for ch, walk, is_drop_off in net.nearest_challenges(
             team.station, self.available_challenges(team), cfg.max_challenge_options
         ):
             prof = profile_for(ch.name)
             reward = self._describe_reward(ch)
-            opts.append(Option(
+            star = "★ 這站就是這個任務最近的下車點，錯過就要繞回來！" if is_drop_off else ""
+            walk_opts.append(Option(
                 key="walk",
-                label=(f"步行 {walk} 分鐘去做任務「{ch.name}」（{ch.location_name}）"
+                label=(f"{star}下車步行 {walk} 分鐘去做任務「{ch.name}」（{ch.location_name}）"
                        f"：{reward}，預計現場約 {round(prof.mean_minutes)} 分鐘"),
                 minutes=walk, challenge=ch.name, call_range=prof.call_range,
             ))
+        # Challenges are the only way to earn chips back, so they lead the
+        # list rather than being buried under half a dozen ride options.
+        opts = walk_opts + opts
 
-        opts.append(Option(key="wait", label=f"原地等待 {cfg.idle_wait_minutes} 分鐘",
-                           minutes=cfg.idle_wait_minutes))
+        if not opts:
+            # Only when there is genuinely nothing else — otherwise waiting
+            # becomes the agent's favourite move, and it is never correct:
+            # there is no mechanic that rewards standing still.
+            opts.append(Option(key="wait", label=f"原地等待 {cfg.idle_wait_minutes} 分鐘",
+                               minutes=cfg.idle_wait_minutes))
         return opts
+
+    def stops_to_claimable(self, station: str, line: str, direction: int,
+                            team: TeamState) -> int | None:
+        """How many stops down this line until a station this team doesn't
+        already own. None if it's all theirs to the end of the line."""
+        order = self.net.line_stations.get(line) or []
+        if station not in order:
+            return None
+        i = order.index(station)
+        for stops in range(1, 15):
+            j = i + direction * stops
+            if not 0 <= j < len(order):
+                return None
+            if self.claims[order[j]].owner != team.name:
+                return stops
+        return None
+
+    def _lookahead(self, station: str, line: str, direction: int, team: TeamState) -> str:
+        """What's worth travelling toward down this line. Without it, a team
+        sitting in the middle of its own territory sees nothing but its own
+        full stations one stop ahead and concludes there is nowhere to go."""
+        order = self.net.line_stations.get(line) or []
+        if station not in order:
+            return ""
+        i = order.index(station)
+        for stops in range(1, 15):
+            j = i + direction * stops
+            if not 0 <= j < len(order):
+                break
+            nxt = order[j]
+            owner = self.claims[nxt].owner
+            if owner is None:
+                return f"　→ 這個方向第 {stops} 站「{nxt}」無人佔領，可以去吃"
+            if owner != team.name:
+                return f"　→ 這個方向第 {stops} 站「{nxt}」是對手的，可以去搶"
+        return "　→ 這個方向前面都是你自己的站了"
+
+    def _station_tag(self, station: str, team: TeamState) -> str:
+        """Whether a destination is worth getting off at, spelled out — the
+        agent otherwise can't tell a free station from one it already owns,
+        and ends up shuttling between its own two stations 'defending' them."""
+        claim = self.claims[station]
+        if claim.owner is None:
+            return "（無人佔領，可用 1 枚佔下 ✅）"
+        if claim.owner == team.name:
+            if claim.value >= claim.cap:
+                return "（你的站，已滿；路過沒關係，但別為了它專程折返）"
+            return f"（你的站，{claim.value}/{claim.cap}，還能加碼）"
+        return f"（{claim.owner} 的站，站上 {claim.value} 枚，要 {claim.value + 1} 枚才搶得下 ⚔️）"
 
     def _describe_reward(self, ch: ChallengeSite) -> str:
         rc = ch.reward_config
@@ -197,39 +291,38 @@ class Engine:
 
     # --- applying a decision ------------------------------------------------
 
+    def _apply_claim(self, team: TeamState, amount: int) -> None:
+        """Costs chips, not time — the team taps it in while they're standing
+        on the platform, so it never competes with the movement choice."""
+        offer = self.claim_offer(team)
+        if offer is None or amount <= 0:
+            return
+        amount = max(offer.lo, min(offer.hi, int(amount)))
+        claim = self.claims[team.station]
+        if offer.kind == "claim":
+            claim.cap = claim.value + self.cfg.max_deposit_per_visit
+            claim.value = amount
+            claim.owner = team.name
+        else:
+            claim.value += amount
+        team.chips -= amount
+        self._say(f"{team.name} 在「{team.station}」{'佔領' if offer.kind == 'claim' else '加碼'} "
+                  f"{amount} 枚（剩 {team.chips}）")
+
     def apply(self, team: TeamState, opt: Option, decision: Decision) -> None:
-        cfg = self.cfg
         if decision.notes:
             team.notes = decision.notes
+
+        # Claim first: it's free in time, so it stacks with whatever move
+        # they picked in the same reply.
+        self._apply_claim(team, decision.claim_amount)
 
         if opt.key in ("stay_on", "board"):
             team.mode = "riding"
             team.line, team.direction = opt.line, opt.direction
             team.station = opt.to_station or team.station
+            team.recent_stations = (team.recent_stations + [team.station])[-8:]
             team.busy_until = self.minute + opt.minutes
-            return
-
-        if opt.key in ("claim", "topup"):
-            claim = self.claims[team.station]
-            lo, hi = self._deposit_bounds(opt.key, claim)
-            hi = min(hi, team.chips)
-            amount = decision.amount if decision.amount is not None else (opt.amount or lo)
-            amount = max(lo, min(hi, int(amount)))
-            if amount < lo or team.chips < amount:
-                team.busy_until = self.minute + 1       # couldn't afford it after all
-                team.mode = "idle"
-                return
-            if opt.key == "claim":
-                claim.cap = claim.value + cfg.max_deposit_per_visit
-                claim.value = amount
-                claim.owner = team.name
-            else:
-                claim.value += amount
-            team.chips -= amount
-            team.mode = "idle"
-            team.busy_until = self.minute + opt.minutes
-            self._say(f"{team.name} 在「{team.station}」{'佔領' if opt.key == 'claim' else '加碼'} "
-                      f"{amount} 枚（剩 {team.chips}）")
             return
 
         if opt.key == "walk":
@@ -281,8 +374,23 @@ class Engine:
 
         reward = self._payout(team, ch, team.challenge_call, bonus)
         self.challenge_state[name] = "retired"
+        self._refill_pool()
         self._say(f"{team.name} 任務「{name}」成功（p={p:.2f}），+{reward} 枚 → {team.chips}")
         team.challenge_call = None
+
+    def _refill_pool(self) -> None:
+        """Mirrors game_logic._refill_pool: a completed challenge pulls more
+        off the backlog, any type this time. No-op when the pool is already
+        fully revealed."""
+        if self.cfg.all_challenges_active:
+            return
+        queued = [n for n, st in self.challenge_state.items() if st == "queued"]
+        if not queued:
+            return
+        self.rng.shuffle(queued)
+        for name in queued[: self.cfg.challenge_pool_refill]:
+            self.challenge_state[name] = "active"
+            self._say(f"新任務公佈：「{name}」")
 
     def _payout(self, team: TeamState, ch: ChallengeSite, called: int | None, bonus: float) -> int:
         """Mirrors game_logic._compute_reward."""

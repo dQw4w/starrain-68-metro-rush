@@ -37,8 +37,8 @@ python3 run.py --games 1 --minutes 60 --transcript
 
 | | `--base-url` | `--model` |
 |---|---|---|
-| Ollama | `http://localhost:11434/v1`（預設） | `qwen2.5:7b` 之類 |
-| LM Studio | `http://localhost:1234/v1` | 介面上載入的那個名字 |
+| Ollama | `http://127.0.0.1:11434/v1`（預設） | `qwen2.5:7b` 之類 |
+| LM Studio | `http://127.0.0.1:1234/v1` | 介面上載入的那個名字 |
 
 模型連不上或回了看不懂的東西時，那一步會自動退回貪婪玩家而不是整場掛掉。
 

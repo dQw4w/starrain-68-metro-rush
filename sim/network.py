@@ -114,14 +114,34 @@ class Network:
             return cfg.transfer_wait_minutes
         return cfg.transfer_walk_minutes + cfg.transfer_wait_minutes
 
+    def nearest_station_to(self, ch: ChallengeSite) -> tuple[str, int]:
+        """Which station to get off at for this challenge, and the walk from
+        it. Lets the agent aim at a far-away challenge instead of only seeing
+        the ones already in walking range."""
+        best = min(
+            self.all_stations,
+            key=lambda s: haversine_m(self.coords[s], (ch.lat, ch.lng)),
+        )
+        return best, self.walk_minutes_station_to_challenge(best, ch)
+
     def nearest_challenges(
         self, station: str, available: set[str], limit: int
-    ) -> list[tuple[ChallengeSite, int]]:
-        scored = [
-            (ch, self.walk_minutes_station_to_challenge(station, ch))
-            for ch in self.challenges
-            if ch.name in available
-        ]
-        scored = [(c, m) for c, m in scored if m <= self.cfg.max_walk_minutes]
-        scored.sort(key=lambda t: t[1])
-        return scored[:limit]
+    ) -> list[tuple[ChallengeSite, int, bool]]:
+        """(challenge, walk minutes, is_this_its_best_drop_off).
+
+        A challenge whose closest station is the one you're standing at is
+        always offered, even if the walk exceeds max_walk_minutes — if you
+        don't get off here you'd have to come back, so it must never be
+        silently dropped from the option list."""
+        out = []
+        for ch in self.challenges:
+            if ch.name not in available:
+                continue
+            walk = self.walk_minutes_station_to_challenge(station, ch)
+            best_station, _ = self.nearest_station_to(ch)
+            is_drop_off = best_station == station
+            if walk <= self.cfg.max_walk_minutes or is_drop_off:
+                out.append((ch, walk, is_drop_off))
+        # Best drop-off points first, then by walk.
+        out.sort(key=lambda t: (not t[2], t[1]))
+        return out[:limit]
