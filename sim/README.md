@@ -11,6 +11,7 @@ sim/
   engine.py      ← 一分鐘一分鐘跑的模擬引擎
   agent.py       ← LLM 玩家 ＋ 不用模型的貪婪基準玩家
   run.py         ← CLI
+  rl/            ← 對抗式訓練：玩家學著贏、遊戲學著變勢均力敵（要 numpy）
 ```
 
 只用 Python 標準函式庫，不用裝任何套件。
@@ -80,3 +81,27 @@ python3 run.py --games 1 --minutes 60 --transcript
 
 `CROSS_PLATFORM_TRANSFERS` 那份清單請你確認一下，我不確定每一站都對，而它每用到一次
 就少算 2 分鐘。
+
+## 對抗式訓練（rl/）
+
+規則機器人只會照固定規則走，測不出「真的想贏的隊伍」會怎麼鑽漏洞。`rl/` 讓兩邊互相逼：
+
+- **玩家**：一個小型神經網路（numpy MLP），每回合替所有合法動作打分數，另外學佔站／加碼要放
+  幾枚、call your shot 要多冒險。用 evolution strategies 自我對打訓練，對手是自己過去的版本
+  ＋規則機器人，起點隨機分配。**目標只有贏。**
+- **設計者**：用 cross-entropy method 調初始代幣和每個任務的獎勵倍率（0.5×～2×），
+  **目標是兩隊車站數接近、兩個起點不偏袒誰、雙方做的任務總數多**，並懲罰離手調數值太遠。
+  玩家還打不贏規則機器人之前，設計者不動（不然兩個爛玩家永遠「很接近」）。
+
+```bash
+cd sim
+python3 -m rl.train --rounds 40            # 訓練，存到 rl/out/
+python3 -m rl.train --rounds 20 --resume   # 接著練
+python3 -m rl.train --report               # 印出建議的獎勵和初始代幣
+```
+
+權重可調：`--w-gap`（差距）、`--w-bias`（起點偏差）、`--w-chal`（任務數）、`--w-reg`（離原本數值多遠）。
+它**不會改** `seed_challenges.py`，`--report` 只印數字，要不要抄過去你決定。
+
+注意：玩家會利用模擬裡的任何不準確——成功率、時間都是估的，它學到的「最佳策略」只在這些估計
+正確時成立。

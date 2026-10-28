@@ -7,9 +7,11 @@ any challenge no longer listed in _CHALLENGES rather than just hiding it).
 Every challenge's `description` defaults to a literal "TBD" placeholder if
 it isn't in _CONTENT, so a new entry here is still playable as soon as its
 reward/location are filled in, even before real content is written.
-Exactly 3 start `pool_state='active'` — all `type='fixed'` (constant-value
-reward) per the game's opening-pool rule; the rest start 'queued' and enter
-play later via activate_initial_pool()/_refill_pool() in game_logic.py.
+Exactly 3 are marked "active" — all `type='fixed'` (constant-value reward)
+per the game's opening-pool rule. Those are the opening pool: seed() stores
+them as `is_initial`, and activate_initial_pool() (first kick-off and every
+full reset) reveals exactly those three instead of a random draw. The rest
+start 'queued' and enter play later via _refill_pool() in game_logic.py.
 
 `seed()` is idempotent and upserts by `name` (see idx_challenges_name in
 schema.sql). It deliberately never overwrites `pool_state` on conflict, so
@@ -53,7 +55,7 @@ _CONTENT: dict[str, tuple[str, str]] = {
         "恭喜你們來到了建成圓環！這裡曾經真的是一個圓環，也是老台北最有名的小吃聚集地之一，"
         "但原本的圓環如今已經被拆除了。既然圓環已經不在，就由你們來把它圍回來吧——請大家圍成一個圓，依照逆時針的方向輪流數數，並且決定好誰先，從1數到你們喊出的目標數字"
         "（須介於30~100之間，開始任務前自行決定）。只是現在星雨是68期，所以遇到6的倍數、8的倍數，"
-        "或是數字中包含6或8，請改成拍手而不把數字數出來。如果成功數到你們喊出的數字，就獲得「目標數字 × 0.3」的代幣（四捨五入），"
+        "或是數字中包含6或8，請改成拍手而不把數字數出來。如果成功數到你們喊出的數字，就獲得「目標數字 × 0.4」的代幣（四捨五入），"
         "但只要有一個人搞砸，或是停頓超過5秒鐘，就任務失敗，一枚都拿不到。",
     ),
     "台北地下街任務": (
@@ -141,7 +143,7 @@ _CONTENT: dict[str, tuple[str, str]] = {
         "要找的是招牌上有「幸福」二字的餐廳、便利商店、超市，或任何有賣食物的店家。"
         "**請先在捷運站內宣告你們要找到幾家，這個數字送出之後就不能更改。**"
         "宣告完之後移動到站外，隨隊人員會倒數計時，從那一刻起限時10分鐘。"
-        "如果在時間內找滿你們宣告的家數，可獲得「宣告家數 × 12」的代幣；"
+        "如果在時間內找滿你們宣告的家數，可獲得「宣告家數 × 11」的代幣；"
         "**但如果只找到比宣告還少的家數，不論只差一家，都算任務失敗，一枚代幣都拿不到。**"
         "所以不要貪心，先想清楚再喊。"
         "另外，尋找過程中全程禁止使用手機。",
@@ -193,7 +195,7 @@ _CONTENT: dict[str, tuple[str, str]] = {
         "距離保夾不遠的機台。\n\n"
         "要找的是「**已投入金額至少是保夾金額一半**」的夾娃娃機。"
         "**請先預測你們能找到幾台，這個數字送出之後就不能更改。**"
-        "接著限時 10 分鐘，如果找到的台數達到你們的預測，就可以獲得「預測台數 × 4」的代幣；"
+        "接著限時 10 分鐘，如果找到的台數達到你們的預測，就可以獲得「預測台數 × 3」的代幣；"
         "**只要找到的台數比預測少，任務就失敗，一枚代幣都拿不到。**\n\n"
         "規則：\n"
         "・**全隊必須和隨隊人員一起行動，不可以分頭找**，"
@@ -212,8 +214,7 @@ _CONTENT: dict[str, tuple[str, str]] = {
     "天台廣場任務": (
         "跟著兔子走",
         "歡迎來到天台廣場！走進這棟樓之後，你們大概就會明白，為什麼大家都說它很「鬼」。"
-        "在《愛麗絲夢遊仙境》裡，愛麗絲就是追著一隻兔子，才掉進兔子洞、闖進那個奇怪的世界——"
-        "在這棟一樣有點奇怪的大樓裡，今天換你們去找兔子了。\n\n"
+        "但至少在這棟「鬼屋」裡面，還是有一隻兔子陪伴著你們的。"
         "請在天台廣場大樓裡面找到如圖的這隻兔子！"
         "要找的是如圖的**立體實物**，海報、招牌之類的平面設計不算。限時 10 分鐘。",
     ),
@@ -459,62 +460,73 @@ _COORD_OVERRIDES: dict[str, tuple[float, float]] = {
     "木柵機廠任務": (25.001748, 121.584985),
     "松山機場任務": (25.064416, 121.550315),
     "頂埔站任務": (24.959737, 121.419616),
-    "明曜百貨任務": (25.041225, 121.552058),
+    "忠孝敦化任務": (25.041225, 121.552058),
     "辛亥國小任務": (25.006418, 121.558877),
     "南港區民活動中心任務": (25.053535, 121.607956),
+    "建成圓環任務": (25.053820, 121.514674),
+    "頂溪站任務": (25.014178, 121.515478),
+    "小碧潭任務": (24.972122, 121.531003),
+    "圓山花博公園任務": (25.071290, 121.521556),
+    "石牌站任務": (25.115081, 121.515178),
+    "三創任務": (25.045184, 121.531116),
+    "饒河夜市任務": (25.050904, 121.577604),
+    "北投圖書館任務": (25.136441, 121.506246),
+    "蘆洲捷運公園任務": (25.091540, 121.464538),
+    "新北大都會公園任務": (25.054850, 121.482584),
 }
 
 # name, type, reward_config, location_name, lat, lng, initial_pool_state
 #
-# Placeholder landmark challenges (36 of them, TBD reward-only entries) have
-# been removed — every challenge here now has real, written content. The 3
-# "active" ones below keep the map from being empty before a superadmin ever
-# touches anything. (They used to all be type='fixed', so a team's first
-# sight of the pool was never a call-your-shot/steal mechanic — 明曜百貨任務
-# becoming 'variable' ends that; there are only two fixed challenges left, so
-# the rule can't hold as stated.) The rest start 'queued' and enter play via
-# activate_initial_pool()/_refill_pool() in game_logic.py.
+# The 3 "active" rows are the fixed opening pool, picked so the two starts
+# (台北車站 / 公館) come out even: each team has its own task 5 minutes
+# away — 西門町 for 台北車站, 台大二活 for 公館 — and 三創 sits between
+# them (12 / 18 min). Of the trios compared in sim/ (8-hour games, a bot that
+# rides to challenges when it's short of chips) this was the closest to
+# even. 台大二活 is a little under its balanced value and 西門町 a little
+# over on purpose: with trained players (sim/rl/) 公館 still came out ~2
+# stations ahead, and moving these two openers (26→21, 13→15) is what
+# removed that. Rerun that comparison before swapping any of them. The rest start
+# 'queued' and enter play via _refill_pool() in game_logic.py.
 _CHALLENGES: list[tuple] = [
-    ("台大二活任務", "fixed", {"chips": 27}, "台大二活門口", 25.012938045228722, 121.53662176506363, "queued"),
-    ("西門町任務", "fixed", {"chips": 11}, "西門站5號出口", 25.04286, 121.5088, "active"),
-    ("建成圓環任務", "variable", {"chips_per_unit": 0.3, "unit_label": "數字"}, "建成圓環", 25.0534, 121.5153, "queued"),
-    ("台北地下街任務", "steal", {"steal_pct": 25}, "台北地下街Y1出口", 25.04886, 121.51906, "queued"),
+    ("台大二活任務", "fixed", {"chips": 21}, "台大二活門口", 25.012938045228722, 121.53662176506363, "active"),
+    ("西門町任務", "fixed", {"chips": 15}, "西門站5號出口", 25.04286, 121.5088, "active"),
+    ("建成圓環任務", "variable", {"chips_per_unit": 0.4, "unit_label": "數字"}, "建成圓環", 25.0534, 121.5153, "queued"),
+    ("台北地下街任務", "steal", {"steal_pct": 35}, "台北地下街Y1出口", 25.04886, 121.51906, "queued"),
 
-    ("葫洲站任務", "fixed", {"chips": 28}, "葫洲站", 25.072610389433837, 121.60702478470597, "active"),
-    ("美麗華任務", "variable", {"chips_per_unit": 2.5, "unit_label": "趟"}, "美麗華百樂園", 25.083694238417248, 121.557050674598, "queued"),
-    ("明曜百貨任務", "variable", {"chips_per_unit": 3, "unit_label": "等級"}, "明曜百貨11樓", 25.041351036032598, 121.55073436774637, "active"),
+    ("葫洲站任務", "fixed", {"chips": 24}, "葫洲站", 25.072610389433837, 121.60702478470597, "queued"),
+    ("美麗華任務", "variable", {"chips_per_unit": 2, "unit_label": "趟"}, "美麗華百樂園", 25.083694238417248, 121.557050674598, "queued"),
+    ("明曜百貨任務", "variable", {"chips_per_unit": 3, "unit_label": "等級"}, "明曜百貨11樓", 25.041351036032598, 121.55073436774637, "queued"),
     # Both nudged ~50m off their station's point (頂埔站 24.959634,
     # 121.419375 / 幸福站 25.049973, 121.460016 — the effective coordinates
     # seed_stations.py gives them) so the pin doesn't sit on top of the
     # station dot. Refine with the superadmin 任務座標 tool if you want them
     # on an exact spot.
     ("頂埔站任務", "steal", {"steal_pct": 35}, "頂埔站板南線月台", 24.959384, 121.419825, "queued"),
-    ("幸福站任務", "variable", {"chips_per_unit": 12, "unit_label": "店家"}, "幸福站", 25.049723, 121.460466, "queued"),
+    ("幸福站任務", "variable", {"chips_per_unit": 11, "unit_label": "店家"}, "幸福站", 25.049723, 121.460466, "queued"),
     # APPROXIMATE COORDINATES — everything below is rounded to 4 decimals on
     # purpose so it doesn't read as surveyed. Replace each with the real spot
     # before the event, either here or via the superadmin 任務座標 tool.
     ("南港區民活動中心任務", "steal", {"steal_pct": 35}, "南港區民活動中心門口階梯處", 25.0530, 121.6060, "queued"),
-    ("松山機場任務", "fixed", {"chips": 17}, "松山機場3F觀景台", 25.0629, 121.5518, "queued"),
-    ("木柵機廠任務", "fixed", {"chips": 33}, "木柵機廠", 24.9980, 121.5810, "queued"),
-    ("辛亥國小任務", "steal", {"steal_pct": 65}, "辛亥國小風雨籃球場", 25.0045, 121.5565, "queued"),
-    ("林本源園邸任務", "fixed", {"chips": 21}, "林本源園邸", 25.0113, 121.4549, "queued"),
+    ("松山機場任務", "fixed", {"chips": 15}, "松山機場3F觀景台", 25.0629, 121.5518, "queued"),
+    ("木柵機廠任務", "fixed", {"chips": 32}, "木柵機廠", 24.9980, 121.5810, "queued"),
+    ("辛亥國小任務", "steal", {"steal_pct": 60}, "辛亥國小風雨籃球場", 25.0045, 121.5565, "queued"),
+    ("林本源園邸任務", "fixed", {"chips": 23}, "林本源園邸", 25.0113, 121.4549, "queued"),
     # Each nudged ~50-150m off its station's point toward where the task
     # actually happens, so the pin doesn't cover the station dot.
-    ("頂溪站任務", "fixed", {"chips": 15}, "頂溪站2號出口", 25.0131, 121.5162, "queued"),
-    ("小碧潭任務", "fixed", {"chips": 20}, "IKEA新店店", 24.9712, 121.5316, "queued"),
+    ("頂溪站任務", "fixed", {"chips": 12}, "頂溪站2號出口", 25.0131, 121.5162, "queued"),
+    ("小碧潭任務", "fixed", {"chips": 21}, "IKEA新店店", 24.9712, 121.5316, "queued"),
     ("圓山花博公園任務", "steal", {"steal_pct": 50}, "花博公園圓山園區", 25.0710, 121.5222, "queued"),
     ("石牌站任務", "variable", {"chips_per_unit": 4, "unit_label": "題"}, "石牌站1號出口", 25.1140, 121.5162, "queued"),
-    ("三創任務", "fixed", {"chips": 11}, "三創生活園區1F", 25.0458, 121.5313, "queued"),
-    ("饒河夜市任務", "variable", {"chips_per_unit": 4, "unit_label": "台"}, "饒河街觀光夜市東側入口", 25.0507, 121.5767, "queued"),
-    ("北投圖書館任務", "fixed", {"chips": 27}, "臺北市立圖書館北投分館", 25.1363, 121.5064, "queued"),
-    # 天台廣場 / 蘆洲捷運公園: I couldn't pin these down from public sources —
-    # both pins are guesses (西門 side of 中華路; near 三民高中站, which is
-    # where one property listing places the park). Fix with 任務座標.
-    ("天台廣場任務", "fixed", {"chips": 8}, "天台廣場", 25.0432, 121.5093, "queued"),
+    ("三創任務", "fixed", {"chips": 10}, "三創生活園區1F", 25.0458, 121.5313, "active"),
+    ("饒河夜市任務", "variable", {"chips_per_unit": 3, "unit_label": "台"}, "饒河街觀光夜市東側入口", 25.0507, 121.5767, "queued"),
+    ("北投圖書館任務", "fixed", {"chips": 29}, "臺北市立圖書館北投分館", 25.1363, 121.5064, "queued"),
+    # 蘆洲捷運公園's pin is a guess (near 三民高中站, where one property
+    # listing places the park). Fix with 任務座標.
+    ("天台廣場任務", "fixed", {"chips": 18}, "天台廣場", 25.061688, 121.497443, "queued"),
     ("蘆洲捷運公園任務", "variable", {"chips_per_unit": 0.5, "unit_label": "秒"}, "蘆洲捷運公園", 25.0852, 121.4740, "queued"),
     # The Airport MRT isn't in the station network, so the sim reaches this
     # via 中和新蘆線 三重 — the two are a short out-of-station transfer apart.
-    ("新北大都會公園任務", "fixed", {"chips": 17}, "機捷三重站", 25.0566, 121.4830, "queued"),
+    ("新北大都會公園任務", "fixed", {"chips": 15}, "機捷三重站", 25.0566, 121.4830, "queued"),
 ]
 
 
@@ -527,21 +539,23 @@ async def seed(conn) -> None:
     — `inner_title` is the real/flavor title, hidden alongside `description`
     until a team's attempt is approved to start."""
     for name, ctype, reward_config, location_name, lat, lng, initial_state in _CHALLENGES:
+        is_initial = initial_state == "active"
         inner_title, description = _CONTENT.get(name, (TBD, TBD))
         lat, lng = _COORD_OVERRIDES.get(name, (lat, lng))
         image_url = _IMAGES.get(name)
         image_url_2 = _IMAGES_2.get(name)
         admin_notes = _ADMIN_NOTES.get(name, "")
         await conn.execute(
-            """INSERT INTO challenges (name, inner_title, description, type, reward_config, location_name, lat, lng, image_url, image_url_2, admin_notes, pool_state)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+            """INSERT INTO challenges (name, inner_title, description, type, reward_config, location_name, lat, lng, image_url, image_url_2, admin_notes, pool_state, is_initial)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
                ON CONFLICT (name) DO UPDATE
                SET inner_title = EXCLUDED.inner_title, description = EXCLUDED.description, type = EXCLUDED.type,
                    reward_config = EXCLUDED.reward_config, location_name = EXCLUDED.location_name,
                    lat = EXCLUDED.lat, lng = EXCLUDED.lng, image_url = EXCLUDED.image_url,
-                   image_url_2 = EXCLUDED.image_url_2, admin_notes = EXCLUDED.admin_notes""",
+                   image_url_2 = EXCLUDED.image_url_2, admin_notes = EXCLUDED.admin_notes,
+                   is_initial = EXCLUDED.is_initial""",
             name, inner_title, description, ctype, json.dumps(reward_config), location_name, lat, lng, image_url,
-            image_url_2, admin_notes, initial_state,
+            image_url_2, admin_notes, initial_state, is_initial,
         )
 
     # Anything in the DB that's no longer listed above (e.g. the placeholder

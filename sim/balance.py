@@ -19,8 +19,6 @@ from config import SimConfig  # noqa: E402
 from fairness import travel_times  # noqa: E402
 from network import Network  # noqa: E402
 
-#: Where "the middle of the city" is, for the farther-pays-more rule.
-CITY_CENTER = "台北車站"
 
 # Steal and multiplier pay a percentage of somebody's balance, so their value
 # depends entirely on what balances actually look like in play. Measured over
@@ -94,10 +92,30 @@ def analyse(ch, prof):
     return typical, prof.success, f"+{rc.get('multiplier_pct')}%｜自己很有錢時 {rich:.0f} 枚"
 
 
+def detour_minutes(net: Network, cfg: SimConfig) -> tuple[dict[str, float], float]:
+    """How much going out of your way to each station really costs.
+
+    Distance from 台北車站 is the wrong yardstick: teams aren't at 台北車站,
+    and a stop two stations off a trunk line can still be miserable to reach
+    if the only way in is a sparse branch shuttle. What a detour costs is:
+    you're at some station A heading for some B, and you stop at T instead,
+    so you lose d(A,T) + d(T,B) - d(A,B). Averaged over every A and B that's
+
+        2 * (mean minutes from anywhere to T) - (mean trip length)
+
+    which is small for a stop that's on the way to everything and large for
+    a dead end, whatever its straight-line distance."""
+    stations = net.all_stations
+    tt = {a: travel_times(net, cfg, a) for a in stations}
+    mean_trip = sum(tt[a].get(b, 0) for a in stations for b in stations) / len(stations) ** 2
+    to = {t: sum(tt[a].get(t, 0) for a in stations) / len(stations) for t in stations}
+    return {t: 2 * to[t] - mean_trip for t in stations}, mean_trip
+
+
 def main() -> None:
     cfg = SimConfig()
     net = Network(cfg)
-    from_center = travel_times(net, cfg, CITY_CENTER)
+    detour, mean_trip = detour_minutes(net, cfg)
     rows = []
     for ch in net.challenges:
         prof = profile_for(ch.name)
@@ -118,21 +136,21 @@ def main() -> None:
         else:
             gap_st = gain_st
         stn, walk = net.nearest_station_to(ch)
-        center = from_center.get(stn, 999) + walk
-        # Detouring to a challenge costs the trip out *and* the trip back to
-        # wherever the game is happening, so distance counts twice.
-        total = 2 * center + mins
+        # Walking out from the station and back is pure detour too.
+        center = detour[stn] + 2 * walk
+        total = center + mins
         rows.append((center, ev, mins, p, ch.name, ch.type, desc, gap_st, total))
     rows.sort()
-    print(f"{'任務':<20}{'型別':<11}{'離中心分':>8}{'總耗時':>7}{'期望枚':>7}{'≈車站':>7}"
+    print(f"{'任務':<20}{'型別':<11}{'繞路分':>8}{'總耗時':>7}{'期望枚':>7}{'≈車站':>7}"
           f"{'站/10分':>8}  獎勵設定")
     print("-" * 112)
     for center, ev, mins, p, name, typ, desc, gap_st, total in rows:
         print(f"{name:<20}{typ:<11}{center:>8.0f}{total:>7.0f}{ev:>7.0f}{gap_st:>7.1f}"
               f"{gap_st / total * 10:>8.2f}  {desc}")
     print("-" * 112)
-    print(f"離中心分 = 從{CITY_CENTER}出發搭車＋走路到任務地點的分鐘數；"
-          f"總耗時 = 來回 ×2 ＋ 現場時間。按離中心距離排序。")
+    print(f"繞路分 = 從隨機一站要去另一個隨機站時，順路繞去做這個任務平均多花的分鐘數"
+          f"（含班次稀疏支線的候車、出站走路來回）；平均一趟車程 {mean_trip:.0f} 分。")
+    print(f"總耗時 = 繞路分 ＋ 現場時間。按繞路分排序。")
     print(f"「≈車站」= 這個任務大約值幾座車站的分差，已折算代幣的邊際價值。")
     print(f"偷竊額外計入對手的損失，但那部分按『對手有 {RICH_BALANCE} 枚』折算，"
           f"而有錢人的代幣邊際價值低（{stations_per_chip(RICH_BALANCE):.2f} 站/枚），"

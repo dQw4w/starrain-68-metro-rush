@@ -33,18 +33,18 @@ class SimConfig:
     # --- what we're tuning -------------------------------------------------
     #: Starting chips per team, keyed by the team label used in results.
     starting_chips: dict[str, int] = field(
-        default_factory=lambda: {"科技大樓隊": 25, "公館隊": 25}
+        default_factory=lambda: {"台北車站隊": 35, "公館隊": 35}
     )
     #: Where each team begins, as a station name from seed_stations.py.
     start_stations: dict[str, str] = field(
-        default_factory=lambda: {"科技大樓隊": "科技大樓", "公館隊": "公館"}
+        default_factory=lambda: {"台北車站隊": "台北車站", "公館隊": "公館"}
     )
     #: Override a challenge's reward without editing seed_challenges.py, e.g.
     #: {"西門町任務": {"chips": 60}}. Merged over the seeded reward_config.
     challenge_reward_overrides: dict[str, dict] = field(default_factory=dict)
 
     # --- game rules (mirror the real backend) ------------------------------
-    game_minutes: int = 6 * 60
+    game_minutes: int = 8 * 60
     max_deposit_per_visit: int = 5
     fail_bonus_step_pct: float = 10.0
     #: True  → every challenge is on the map from minute 0, which is what the
@@ -62,11 +62,26 @@ class SimConfig:
     #: minute 0 — a random opening draw can put all three on the far side of
     #: the city and leave both teams with nothing to do but claim stations.
     #: None = keep the live behaviour (random fixed-reward draw).
-    initial_active_challenges: list[str] | None = None
+    initial_active_challenges: list[str] | None = field(
+        default_factory=lambda: ["台大二活任務", "西門町任務", "三創任務"]
+    )
 
     # --- transit model -----------------------------------------------------
     minutes_per_segment: int = 2
+    #: Expected wait for a train on a line not listed below (≈ half the
+    #: headway). Also what a cross-platform transfer costs.
     wait_minutes: int = 2
+    #: Lines that run noticeably less often than the trunk lines, as the
+    #: expected wait (≈ half the weekend headway) by line code. A branch you
+    #: can only reach by one sparse shuttle is far in practice even when
+    #: it's two stops on the map — this is what makes 小碧潭 cost what it
+    #: does. GUESSES: check the weekend timetables.
+    line_wait_minutes: dict[str, int] = field(default_factory=lambda: {
+        "G_BR": 6,   # 小碧潭支線, ~12 min headway
+        "R_BR": 4,   # 新北投支線, ~8 min
+        "O_BR": 3,   # 蘆洲支線, every other 中和新蘆 train
+        "Y": 3,      # 環狀線, ~6 min
+    })
     transfer_walk_minutes: int = 2
     transfer_wait_minutes: int = 2
     #: Brisk urban walking. 80 m/min ≈ 4.8 km/h.

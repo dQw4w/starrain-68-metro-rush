@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS game_config (
     end_time TIME NOT NULL DEFAULT '18:00',
     lunch_start TIME NOT NULL DEFAULT '12:00',
     lunch_end TIME NOT NULL DEFAULT '13:00',
-    starting_chips INT NOT NULL DEFAULT 50,
+    starting_chips INT NOT NULL DEFAULT 35,
     max_deposit_per_visit INT NOT NULL DEFAULT 5,
     fail_bonus_step_pct NUMERIC NOT NULL DEFAULT 25,
     challenge_pool_initial INT NOT NULL DEFAULT 3,
@@ -166,6 +166,12 @@ ALTER TABLE challenges ADD COLUMN IF NOT EXISTS admin_notes TEXT NOT NULL DEFAUL
 -- front, same public/teaser visibility as image_url. NULL for every other
 -- challenge.
 ALTER TABLE challenges ADD COLUMN IF NOT EXISTS image_url_2 TEXT;
+
+-- The fixed opening pool, set by seed_challenges.py on every deploy (unlike
+-- pool_state, which seeding never touches). activate_initial_pool() reveals
+-- exactly these instead of a random draw, so the opening is fair to both
+-- teams' start stations every time — including after a full reset.
+ALTER TABLE challenges ADD COLUMN IF NOT EXISTS is_initial BOOLEAN NOT NULL DEFAULT false;
 
 -- Lets seed_challenges.py upsert by name instead of inserting a fresh
 -- duplicate row every time the seed data changes.

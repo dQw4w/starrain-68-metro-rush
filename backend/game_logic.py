@@ -761,7 +761,12 @@ async def activate_initial_pool() -> None:
     fixed-reward challenges only — no variable/steal/multiplier — so new
     teams aren't hit with a "call your shot" or steal mechanic before they've
     even seen a normal challenge; later refills (see _refill_pool) draw from
-    every type."""
+    every type.
+
+    The challenges seeded as `is_initial` go first, because they're the set
+    picked to be fair to both start stations; only if that leaves slots
+    open (fewer marked than challenge_pool_initial) is the rest drawn at
+    random from the other fixed ones."""
     pool = get_pool()
     async with pool.acquire() as conn:
         async with conn.transaction():
@@ -771,9 +776,12 @@ async def activate_initial_pool() -> None:
             slots = target - active_count
             if slots > 0:
                 candidates = await conn.fetch(
-                    "SELECT id, name FROM challenges WHERE pool_state = 'queued' AND type = 'fixed'"
+                    "SELECT id, name, is_initial FROM challenges WHERE pool_state = 'queued' AND type = 'fixed'"
                 )
-                chosen = random.sample(candidates, k=min(slots, len(candidates))) if candidates else []
+                marked = [r for r in candidates if r["is_initial"]][:slots]
+                rest = [r for r in candidates if not r["is_initial"]]
+                fill = slots - len(marked)
+                chosen = marked + (random.sample(rest, k=min(fill, len(rest))) if fill > 0 and rest else [])
                 for row in chosen:
                     await conn.execute("UPDATE challenges SET pool_state = 'active' WHERE id = $1", row["id"])
                     await log_challenge_published(conn, row["id"], row["name"])

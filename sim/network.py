@@ -57,6 +57,8 @@ class Network:
             for n in names:
                 self.lines_at.setdefault(n, []).append(code)
 
+        self._walk_cache: dict[tuple[str, str], int] = {}
+        self._nearest_cache: dict[str, tuple[str, int]] = {}
         self.challenges: list[ChallengeSite] = []
         for name, ctype, reward, location_name, lat, lng, _state in seed_challenges._CHALLENGES:
             lat, lng = seed_challenges._COORD_OVERRIDES.get(name, (lat, lng))
@@ -101,28 +103,41 @@ class Network:
         return max(1, round(metres / self.cfg.walk_speed_m_per_min))
 
     def walk_minutes_station_to_challenge(self, station: str, ch: ChallengeSite) -> int:
-        return self.walk_minutes(self.coords[station], (ch.lat, ch.lng))
+        key = (station, ch.name)
+        if key not in self._walk_cache:
+            self._walk_cache[key] = self.walk_minutes(self.coords[station], (ch.lat, ch.lng))
+        return self._walk_cache[key]
 
     def board_cost(self, station: str, from_line: str | None, to_line: str) -> int:
         """Minutes from standing on the concourse to the train pulling out:
         a wait, plus the walk between platforms when it's a real transfer."""
         cfg = self.cfg
         if from_line is None or from_line == to_line:
-            return cfg.wait_minutes
+            return self.wait_for(to_line, cfg.wait_minutes)
+        wait = self.wait_for(to_line, cfg.transfer_wait_minutes)
         if station in CROSS_PLATFORM_TRANSFERS:
             # Same platform — just wait for the other line's train.
-            return cfg.transfer_wait_minutes
-        return cfg.transfer_walk_minutes + cfg.transfer_wait_minutes
+            return wait
+        return cfg.transfer_walk_minutes + wait
+
+    def wait_for(self, line: str, default: int) -> int:
+        """Expected wait to board `line`: longer on the sparse branches."""
+        return self.cfg.line_wait_minutes.get(line, default)
 
     def nearest_station_to(self, ch: ChallengeSite) -> tuple[str, int]:
         """Which station to get off at for this challenge, and the walk from
         it. Lets the agent aim at a far-away challenge instead of only seeing
         the ones already in walking range."""
-        best = min(
-            self.all_stations,
-            key=lambda s: haversine_m(self.coords[s], (ch.lat, ch.lng)),
-        )
-        return best, self.walk_minutes_station_to_challenge(best, ch)
+        # Cached: it's asked for every challenge on every turn, and was ~80%
+        # of a game's runtime before — which matters once games are run by
+        # the tens of thousands (see rl/).
+        if ch.name not in self._nearest_cache:
+            best = min(
+                self.all_stations,
+                key=lambda s: haversine_m(self.coords[s], (ch.lat, ch.lng)),
+            )
+            self._nearest_cache[ch.name] = (best, self.walk_minutes_station_to_challenge(best, ch))
+        return self._nearest_cache[ch.name]
 
     def nearest_challenges(
         self, station: str, available: set[str], limit: int

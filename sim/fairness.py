@@ -20,7 +20,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from challenges import profile_for  # noqa: E402
-from config import CROSS_PLATFORM_TRANSFERS, SimConfig  # noqa: E402
+from config import SimConfig  # noqa: E402
 from network import Network  # noqa: E402
 
 
@@ -32,7 +32,7 @@ def travel_times(net: Network, cfg: SimConfig, origin: str) -> dict[str, int]:
     pq: list[tuple[int, str, str]] = []
     for line in net.lines_at.get(origin, []):
         # Boarding anything from a standstill costs one wait.
-        heapq.heappush(pq, (cfg.wait_minutes, origin, line))
+        heapq.heappush(pq, (net.board_cost(origin, None, line), origin, line))
     best: dict[str, int] = {origin: 0}
 
     while pq:
@@ -54,9 +54,7 @@ def travel_times(net: Network, cfg: SimConfig, origin: str) -> dict[str, int]:
         for other in net.lines_at.get(station, []):
             if other == line:
                 continue
-            pen = (cfg.transfer_wait_minutes if station in CROSS_PLATFORM_TRANSFERS
-                   else cfg.transfer_walk_minutes + cfg.transfer_wait_minutes)
-            nt = t + pen
+            nt = t + net.board_cost(station, line, other)
             if nt < dist.get((station, other), 10**9):
                 heapq.heappush(pq, (nt, station, other))
     return best

@@ -10,7 +10,9 @@ from __future__ import annotations
 
 import random
 
+from challenges import profile_for
 from engine import ClaimOffer, Decision, Engine, Option, TeamState
+from fairness import travel_times
 from llm import LLMClient, LLMError, extract_json
 from network import haversine_m
 
@@ -263,10 +265,52 @@ class ExplorerAgent:
     difference in the result is a difference in the setup.
     """
 
-    def __init__(self, rng: random.Random, challenge_chip_floor: int = 12):
+    def __init__(self, rng: random.Random, challenge_chip_floor: int = 12,
+                 seek_challenges: bool = True):
         self.rng = rng
         #: Below this many chips, grab any challenge at hand to refill.
         self.floor = challenge_chip_floor
+        #: Below the floor with nothing in walking range, ride toward the best
+        #: challenge on the map instead of carrying on claiming. Without this
+        #: the bot only ever does a challenge it happens to pass, and a team
+        #: whose sweep doesn't pass one sits broke for hours — which is what
+        #: no real team does, and what made start positions look lopsided.
+        self.seek = seek_challenges
+        self._tt: dict[str, dict[str, int]] = {}
+
+    def _minutes(self, engine: Engine, frm: str, to: str) -> int:
+        if frm not in self._tt:
+            self._tt[frm] = travel_times(engine.net, engine.cfg, frm)
+        return self._tt[frm].get(to, 10**6)
+
+    def _expected_chips(self, engine: Engine, team: TeamState, ch) -> float:
+        prof = profile_for(ch.name)
+        rc = ch.reward_config
+        if ch.type == "fixed":
+            return rc.get("chips", 0) * prof.success
+        if ch.type == "variable":
+            lo, hi = prof.call_range or (1, 1)
+            per = rc.get("chips_per_unit", 0)
+            return max(n * per * prof.success_prob(n) for n in range(lo, hi + 1))
+        if ch.type == "steal":
+            # Judged on what the richest opponent actually holds right now.
+            richest = max((t.chips for t in engine.teams.values() if t.name != team.name), default=0)
+            return richest * rc.get("steal_pct", 0) / 100 * prof.success
+        return 0.0
+
+    def _target(self, engine: Engine, team: TeamState):
+        """(drop-off station) of the challenge paying the most per minute of
+        getting there and doing it, or None if nothing's worth the trip."""
+        best, best_rate = None, 0.0
+        for ch in engine.net.challenges:
+            if ch.name not in engine.available_challenges(team):
+                continue
+            stn, walk = engine.net.nearest_station_to(ch)
+            minutes = self._minutes(engine, team.station, stn) + walk + profile_for(ch.name).mean_minutes
+            rate = self._expected_chips(engine, team, ch) / max(1, minutes)
+            if rate > best_rate:
+                best, best_rate = stn, rate
+        return best
 
     def decide(self, engine: Engine, team: TeamState, options: list[Option]) -> Decision:
         claim_amount = 0
@@ -293,6 +337,20 @@ class ExplorerAgent:
                 call = max(range(lo, hi + 1), key=lambda n: n * prof.success_prob(n))
             return Decision(best_walk, claim_amount=claim_amount, call_value=call,
                             notes="explorer: challenge")
+
+        # Broke and nothing in walking range: ride toward the best challenge,
+        # claiming whatever's free along the way (claim_amount still applies).
+        if self.seek and team.chips <= self.floor:
+            target = self._target(engine, team)
+            if target is not None and target != team.station:
+                rides = [
+                    (o.minutes + self._minutes(engine, o.to_station, target), i)
+                    for i, o in enumerate(options)
+                    if o.key in ("stay_on", "board") and o.to_station
+                ]
+                if rides:
+                    return Decision(min(rides)[1], claim_amount=claim_amount,
+                                    notes=f"explorer: heading to challenge near {target}")
 
         # Head wherever the nearest not-mine station is.
         scored: list[tuple[int, int]] = []
