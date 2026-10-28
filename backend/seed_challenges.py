@@ -143,7 +143,7 @@ _CONTENT: dict[str, tuple[str, str]] = {
         "要找的是招牌上有「幸福」二字的餐廳、便利商店、超市，或任何有賣食物的店家。"
         "**請先在捷運站內宣告你們要找到幾家，這個數字送出之後就不能更改。**"
         "宣告完之後移動到站外，隨隊人員會倒數計時，從那一刻起限時10分鐘。"
-        "如果在時間內找滿你們宣告的家數，可獲得「宣告家數 × 11」的代幣；"
+        "如果在時間內找滿你們宣告的家數，可獲得「宣告家數 × 2」的代幣；"
         "**但如果只找到比宣告還少的家數，不論只差一家，都算任務失敗，一枚代幣都拿不到。**"
         "所以不要貪心，先想清楚再喊。"
         "另外，尋找過程中全程禁止使用手機。",
@@ -502,7 +502,7 @@ _CHALLENGES: list[tuple] = [
     # station dot. Refine with the superadmin 任務座標 tool if you want them
     # on an exact spot.
     ("頂埔站任務", "steal", {"steal_pct": 35}, "頂埔站板南線月台", 24.959384, 121.419825, "queued"),
-    ("幸福站任務", "variable", {"chips_per_unit": 11, "unit_label": "店家"}, "幸福站", 25.049723, 121.460466, "queued"),
+    ("幸福站任務", "variable", {"chips_per_unit": 2, "unit_label": "店家"}, "幸福站", 25.049723, 121.460466, "queued"),
     # APPROXIMATE COORDINATES — everything below is rounded to 4 decimals on
     # purpose so it doesn't read as surveyed. Replace each with the real spot
     # before the event, either here or via the superadmin 任務座標 tool.

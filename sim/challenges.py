@@ -172,10 +172,15 @@ PROFILES: dict[str, ChallengeProfile] = {
     "林本源園邸任務": ChallengeProfile(mean_minutes=18, sd_minutes=4, success=0.8),
     # Find n 幸福-signed food shops in 10 minutes, no phone. Nobody knows how
     # many exist near the station; a gut-feel 2.5 found on average, so 1 is
-    # ~92%, 2 ~71%, 3 ~46%, 4 ~24%.
+    # ~92%, 2 ~71%, 3 ~46%, 4 ~24%. The reward (2/shop) is deliberately set
+    # low rather than balanced against this guess: with the count unknown,
+    # underpaying only means teams skip it, while overpaying could break the
+    # game if the street turns out to be full of them. At 2.5 it's worth
+    # about a fifth of a normal task; it'd take ~12 found on average for
+    # 2/shop to pay like the others.
     "幸福站任務": ChallengeProfile(
         mean_minutes=14, sd_minutes=3,
-        call_range=(1, 8),
+        call_range=(1, 30),
         success_fn=lambda n: _poisson_at_least(2.5, n),
     ),
     # Find 世界豆漿大王 without a phone — but asking passers-by is allowed,
