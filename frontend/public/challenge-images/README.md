@@ -30,6 +30,8 @@ Currently expected by seed_challenges.py:
 - `bombardier-train.png` — 木柵機廠任務, `image_url_2` (龐巴迪列車)
 - `lin-garden-inscription.jpg` — 林本源園邸任務 (the 題字 the team memorises
   at the gate and then hunts for inside — task material, not just a hint)
+- `tiantai-rabbit.jpg` — 天台廣場任務 (the rabbit to find — task material)
+- `luzhou-bar.jpg` — 蘆洲捷運公園任務 (the bar to hang from)
 
 The 木柵機廠 description says 左圖 = 馬特拉 and 右圖 = 龐巴迪, and the modal
 renders `image_url` on the left, `image_url_2` on the right — so those two

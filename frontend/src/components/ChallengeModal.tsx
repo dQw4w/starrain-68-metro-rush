@@ -191,7 +191,7 @@ export default function ChallengeModal({
                 />
                 {calledShotValue != null && chipsPerUnit > 0 && (
                   <p className="mt-1 text-emerald-400 text-xs">
-                    成功可獲得 {calledShotValue} × {chipsPerUnit} = {calledShotValue * chipsPerUnit} 枚代幣
+                    成功可獲得 {calledShotValue} × {chipsPerUnit} = {Math.round(calledShotValue * chipsPerUnit)} 枚代幣
                     {bonusPct > 0 && `（含 +${bonusPct}% 加成後為 ${Math.round(calledShotValue * chipsPerUnit * (1 + bonusPct / 100))}）`}
                   </p>
                 )}

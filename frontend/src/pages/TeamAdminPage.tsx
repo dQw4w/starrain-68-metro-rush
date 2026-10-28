@@ -353,7 +353,7 @@ function PendingCard({
         <p className="text-xs text-white/50">
           喊出數量：{calledShotValue} 個「{unitLabel}」
           {req.kind === 'challenge_result' && chipsPerUnit > 0 && (
-            <span className="text-emerald-400"> · 判定成功可得 {calledShotValue * chipsPerUnit} 枚代幣</span>
+            <span className="text-emerald-400"> · 判定成功可得 {Math.round(calledShotValue * chipsPerUnit)} 枚代幣</span>
           )}
         </p>
       )}
