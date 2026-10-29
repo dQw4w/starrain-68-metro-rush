@@ -501,7 +501,7 @@ _CHALLENGES: list[tuple] = [
     # seed_stations.py gives them) so the pin doesn't sit on top of the
     # station dot. Refine with the superadmin 任務座標 tool if you want them
     # on an exact spot.
-    ("頂埔站任務", "steal", {"steal_pct": 35}, "頂埔站板南線月台", 24.959384, 121.419825, "queued"),
+    ("頂埔站任務", "steal", {"steal_pct": 45}, "頂埔站板南線月台", 24.959384, 121.419825, "queued"),
     ("幸福站任務", "variable", {"chips_per_unit": 2, "unit_label": "店家"}, "幸福站", 25.049723, 121.460466, "queued"),
     # APPROXIMATE COORDINATES — everything below is rounded to 4 decimals on
     # purpose so it doesn't read as surveyed. Replace each with the real spot
@@ -509,7 +509,7 @@ _CHALLENGES: list[tuple] = [
     ("南港區民活動中心任務", "steal", {"steal_pct": 35}, "南港區民活動中心門口階梯處", 25.0530, 121.6060, "queued"),
     ("松山機場任務", "fixed", {"chips": 15}, "松山機場3F觀景台", 25.0629, 121.5518, "queued"),
     ("木柵機廠任務", "fixed", {"chips": 32}, "木柵機廠", 24.9980, 121.5810, "queued"),
-    ("辛亥國小任務", "steal", {"steal_pct": 60}, "辛亥國小風雨籃球場", 25.0045, 121.5565, "queued"),
+    ("辛亥國小任務", "steal", {"steal_pct": 55}, "辛亥國小風雨籃球場", 25.0045, 121.5565, "queued"),
     ("林本源園邸任務", "fixed", {"chips": 23}, "林本源園邸", 25.0113, 121.4549, "queued"),
     # Each nudged ~50-150m off its station's point toward where the task
     # actually happens, so the pin doesn't cover the station dot.
@@ -517,16 +517,16 @@ _CHALLENGES: list[tuple] = [
     ("小碧潭任務", "fixed", {"chips": 21}, "IKEA新店店", 24.9712, 121.5316, "queued"),
     ("圓山花博公園任務", "steal", {"steal_pct": 50}, "花博公園圓山園區", 25.0710, 121.5222, "queued"),
     ("石牌站任務", "variable", {"chips_per_unit": 4, "unit_label": "題"}, "石牌站1號出口", 25.1140, 121.5162, "queued"),
-    ("三創任務", "fixed", {"chips": 10}, "三創生活園區1F", 25.0458, 121.5313, "active"),
+    ("三創任務", "fixed", {"chips": 12}, "三創生活園區1F", 25.0458, 121.5313, "active"),
     ("饒河夜市任務", "variable", {"chips_per_unit": 3, "unit_label": "台"}, "饒河街觀光夜市東側入口", 25.0507, 121.5767, "queued"),
     ("北投圖書館任務", "fixed", {"chips": 29}, "臺北市立圖書館北投分館", 25.1363, 121.5064, "queued"),
     # 蘆洲捷運公園's pin is a guess (near 三民高中站, where one property
     # listing places the park). Fix with 任務座標.
-    ("天台廣場任務", "fixed", {"chips": 18}, "天台廣場", 25.061688, 121.497443, "queued"),
+    ("天台廣場任務", "fixed", {"chips": 20}, "天台廣場", 25.061688, 121.497443, "queued"),
     ("蘆洲捷運公園任務", "variable", {"chips_per_unit": 0.5, "unit_label": "秒"}, "蘆洲捷運公園", 25.0852, 121.4740, "queued"),
     # The Airport MRT isn't in the station network, so the sim reaches this
     # via 中和新蘆線 三重 — the two are a short out-of-station transfer apart.
-    ("新北大都會公園任務", "fixed", {"chips": 15}, "機捷三重站", 25.0566, 121.4830, "queued"),
+    ("新北大都會公園任務", "fixed", {"chips": 18}, "機捷三重站", 25.0566, 121.4830, "queued"),
 ]
 
 
